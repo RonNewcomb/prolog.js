@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "moduleResolution": "Node",
+        "allowJs": false,
+        "skipLibCheck": true,
+        "module": "esnext",
+        "resolveJsonModule": true,
+        "noEmit": false,
+    },
+    "include": [
+        "**/*"
+    ]
+}
