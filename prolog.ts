@@ -21,13 +21,14 @@ const enum ops {
     comment = '#',
 }
 
-
+const commandLineEl: HTMLInputElement = document.getElementById('commandline')! as HTMLInputElement;
 const consoleOutEl: HTMLDivElement = document.getElementById('consoleout')! as HTMLDivElement;
 
 function newConsoleLine(): HTMLDivElement {
     var elemDiv = document.createElement('div');
     elemDiv.innerHTML = '&nbsp;';
     consoleOutEl.appendChild(elemDiv);
+    if (commandLineEl) commandLineEl.scrollIntoView();
     return elemDiv;
 }
 
@@ -41,6 +42,13 @@ function print(str: string | number) {
         consoleOutEl.lastElementChild!.append(line);
         if (multiline) newConsoleLine();
     }
+}
+
+function printUserline(str: string) {
+    const div = newConsoleLine();
+    //div.classList.add('errdiv');
+    div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
 }
 
 function consoleOutError(...rest: (any)[]) {
@@ -85,27 +93,21 @@ function nextlines(text: string, el?: HTMLTextAreaElement) {
 
 // called from HTML
 function nextline(line: string, el?: HTMLInputElement): Database {
+    printUserline(line);
     if (!line) return database;
     if (el) el.value = '';
-    console.warn(line);
     if (line.substring(0, 1) == ops.comment || line == "" || line.match(/^\s*$/)) {
-        print(line);
         return database;
     }
     const or = Rule.parse(new Tokeniser(line));
-    if (or == null) {
-        // print('\n');
-        return database;
-    }
+    if (or == null) return database;
     database.push(or);
     if (document.input.showparse.checked) or.print()
     if (or.asking && or.body) {
         const vs = varNames(or.body.list);
         answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, database, 1, applyOne(printVars, vs));
     }
-    // print('\n');
     if (el) el.scrollIntoView();
-
     return database;
 }
 
@@ -1092,3 +1094,4 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
     return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
+freeform();

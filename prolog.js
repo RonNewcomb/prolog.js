@@ -1,8 +1,11 @@
+const commandLineEl = document.getElementById('commandline');
 const consoleOutEl = document.getElementById('consoleout');
 function newConsoleLine() {
     var elemDiv = document.createElement('div');
     elemDiv.innerHTML = '&nbsp;';
     consoleOutEl.appendChild(elemDiv);
+    if (commandLineEl)
+        commandLineEl.scrollIntoView();
     return elemDiv;
 }
 function print(str) {
@@ -17,6 +20,12 @@ function print(str) {
         if (multiline)
             newConsoleLine();
     }
+}
+function printUserline(str) {
+    const div = newConsoleLine();
+    //div.classList.add('errdiv');
+    div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
 }
 function consoleOutError(...rest) {
     const div = newConsoleLine();
@@ -49,20 +58,17 @@ function nextlines(text, el) {
 }
 // called from HTML
 function nextline(line, el) {
+    printUserline(line);
     if (!line)
         return database;
     if (el)
         el.value = '';
-    console.warn(line);
     if (line.substring(0, 1) == "#" /* comment */ || line == "" || line.match(/^\s*$/)) {
-        print(line);
         return database;
     }
     const or = Rule.parse(new Tokeniser(line));
-    if (or == null) {
-        // print('\n');
+    if (or == null)
         return database;
-    }
     database.push(or);
     if (document.input.showparse.checked)
         or.print();
@@ -70,7 +76,6 @@ function nextline(line, el) {
         const vs = varNames(or.body.list);
         answerQuestion(renameVariables(or.body.list, 0, []), {}, database, 1, applyOne(printVars, vs));
     }
-    // print('\n');
     if (el)
         el.scrollIntoView();
     return database;
@@ -905,3 +910,4 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
     // Just prove the rest of the goallist, recursively.
     return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
+freeform();
