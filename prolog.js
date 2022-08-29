@@ -342,7 +342,7 @@ class Term {
             while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
                 part = part.partlist.list[1];
             }
-            if ((part.type == "Atom" && part.name == "nil") || part.type == "Variable") {
+            if ((part.type == "Atom" && part.name == "nothing") || part.type == "Variable") {
                 part = this;
                 print("{" /* openList */);
                 let com = false;
@@ -444,10 +444,10 @@ class Partlist {
         if (tk.type == "punc" && tk.current == "{" /* openList */) {
             tk = tk.consume();
             // destructure a list
-            // Special case: {} = new atom(nil).
+            // Special case: {} = new atom(nothing).
             if (tk.type == "punc" && tk.current == "}" /* closeList */) {
                 tk = tk.consume();
-                return new Atom("nil");
+                return new Atom("nothing");
             }
             // Get a list of parts into l
             const parts = [];
@@ -475,7 +475,7 @@ class Partlist {
                 tk = tk.consume();
             }
             else {
-                append = new Atom("nil");
+                append = new Atom("nothing");
             }
             if (tk.current != "}" /* closeList */) {
                 consoleOutError("list destructure wasn't ended by }");
@@ -547,7 +547,7 @@ class Rule {
         else {
             if (!this.asking)
                 this.head.print();
-            print(" " + (this.asking ? "?-" /* query */ : ":-" /* if */) + " ");
+            print(" " + (this.asking ? "?-" /* query */ : "if" /* if */) + " ");
             this.body.print();
             print("." /* endSentence */ + "\n");
         }
@@ -562,7 +562,7 @@ class Rule {
             return new Rule(h);
         }
         const isQuestion = tk.current == "?-" /* query */;
-        if (tk.current != ":-" /* if */ && !isQuestion)
+        if (tk.current != "if" /* if */ && !isQuestion)
             return null;
         tk = tk.consume();
         const b = Rule.parseBody(tk);
@@ -618,7 +618,7 @@ class Tokeniser {
             return this;
         }
         // punctuation   {  }  .  ,  [  ]  |  !  :- ?-
-        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-|\?\-)(.*)$/);
+        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\bif\b|\?\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
@@ -765,8 +765,8 @@ function BagOf(thisTerm, goalList, environment, db, level, reportFunction) {
     anslist.renumber = -1;
     const ret = answerQuestion(newGoals, environment, db, level + 1, BagOfCollectFunction(collect, anslist));
     // Turn anslist into a proper list and unify with 'into'
-    // optional here: nil anslist -> fail?
-    let answers = new Atom("nil");
+    // optional here: nothing anslist -> fail?
+    let answers = new Atom("nothing");
     /*
     print("Debug: anslist = [");
         for (var j = 0; j < anslist.length; j++) {
@@ -836,7 +836,7 @@ function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) 
         second = second.partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nil") {
+    if (second.type != "Atom" || second.name != "nothing") {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -847,7 +847,7 @@ function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) 
         ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
-        ret = "nil";
+        ret = "nothing";
     // Convert back into an atom...
     const env2 = unify(thisTerm.partlist.list[2], new Atom(ret), environment);
     if (env2 == null) {
@@ -887,7 +887,7 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
         second = second.partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nil") {
+    if (second.type != "Atom" || second.name != "nothing") {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -898,7 +898,7 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
         ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
-        ret = "nil";
+        ret = "nothing";
     // Convert back into a Prolog term by calling the appropriate Parse routine...
     const part = Partlist.parse1(new Tokeniser(ret));
     //print("DEBUG: external2, ret = "); ret.print(); print(".\n");

@@ -16,7 +16,7 @@ const enum ops {
     sliceList = '|',
     endSentence = '.',
     endQuestion = '?',
-    if = ':-',
+    if = 'if',
     query = '?-',
     comment = '#',
 }
@@ -412,7 +412,7 @@ class Term {
             while (part.type == "Term" && part.name == "cons" && (part as Term).partlist.list.length == 2) {
                 part = (part as Term).partlist.list[1];
             }
-            if ((part.type == "Atom" && part.name == "nil") || part.type == "Variable") {
+            if ((part.type == "Atom" && part.name == "nothing") || part.type == "Variable") {
                 part = this;
                 print(ops.openList);
                 let com = false;
@@ -529,10 +529,10 @@ class Partlist {
 
             // destructure a list
 
-            // Special case: {} = new atom(nil).
+            // Special case: {} = new atom(nothing).
             if (tk.type == "punc" && tk.current == ops.closeList) {
                 tk = tk.consume();
-                return new Atom("nil");
+                return new Atom("nothing");
             }
 
             // Get a list of parts into l
@@ -562,7 +562,7 @@ class Partlist {
                 append = new Variable(tk.current!);
                 tk = tk.consume();
             } else {
-                append = new Atom("nil");
+                append = new Atom("nothing");
             }
             if (tk.current != ops.closeList) {
                 consoleOutError("list destructure wasn't ended by }");
@@ -734,7 +734,7 @@ class Tokeniser {
         }
 
         // punctuation   {  }  .  ,  [  ]  |  !  :- ?-
-        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-|\?\-)(.*)$/);
+        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\bif\b|\?\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
@@ -918,8 +918,8 @@ function BagOf(thisTerm: Term, goalList: Term[], environment: Environment, db: D
 
     // Turn anslist into a proper list and unify with 'into'
 
-    // optional here: nil anslist -> fail?
-    let answers: Part = new Atom("nil");
+    // optional here: nothing anslist -> fail?
+    let answers: Part = new Atom("nothing");
 
     /*
     print("Debug: anslist = [");
@@ -1003,7 +1003,7 @@ function ExternalJS(thisTerm: Term, goalList: Term[], environment: Environment, 
         second = (second as Term).partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nil") {
+    if (second.type != "Atom" || second.name != "nothing") {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -1016,7 +1016,7 @@ function ExternalJS(thisTerm: Term, goalList: Term[], environment: Environment, 
 
     //print("DEBUG: External/3 got "+ret+" back\n");
 
-    if (!ret) ret = "nil";
+    if (!ret) ret = "nothing";
 
 
     // Convert back into an atom...
@@ -1063,7 +1063,7 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
         second = (second as Term).partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nil") {
+    if (second.type != "Atom" || second.name != "nothing") {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -1076,7 +1076,7 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
 
     //print("DEBUG: External/3 got "+ret+" back\n");
 
-    if (!ret) ret = "nil";
+    if (!ret) ret = "nothing";
 
 
     // Convert back into a Prolog term by calling the appropriate Parse routine...
