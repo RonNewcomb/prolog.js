@@ -22,7 +22,7 @@
 
     <form name="rules" action="javascript:return false;">
       <p>
-        <textarea cols="90" rows="40" name="rules">
+        <textarea style="width: 100%; height: 100vh" name="rules">
 # Enter your ruleset in here.
 [triple, sc, a, b].
 [triple, sc, b, c].
@@ -87,6 +87,8 @@
 [varTest, a].
 [tarTest, b].
 
+?- [bagof, c, [triple, sc, A, B], L], [length, L, N] # L should have 21 elements
+
 </textarea
         >
       </p>
@@ -101,7 +103,7 @@
     </form>
     <form name="output" action="javascript:return false;">
       <p>
-        <textarea rows="40" cols="200" name="output"></textarea>
+        <textarea style="width: 100%; height: 100vh" name="output"></textarea>
       </p>
     </form>
   </body>

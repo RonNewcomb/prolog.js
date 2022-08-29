@@ -14,6 +14,11 @@ const enum ops {
     openList = '{',
     closeList = '}',
     sliceList = '|',
+    endSentence = '.',
+    endQuestion = '?',
+    if = ':-',
+    query = '?-',
+    comment = '#',
 }
 
 function cls() {
@@ -41,20 +46,7 @@ function freeform() {
     var rules: string[] = document.rules.rules.value.split("\n");
     var show = document.input.showparse.checked;
     var query: string = document.input.query.value;
-
-    print("Parsing rulesets.\n");
-
     var outr = [] as Database, outi = 0;
-    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
-        //console.log("Line", currentLineNumber + 1);
-        currentRule = rules[currentLineNumber];
-        if (currentRule.substring(0, 1) == "#" || currentRule == "") continue;
-        var or = ParseRule(new Tokeniser(currentRule));
-        if (or == null) continue;
-        outr[outi++] = or;
-        // print ("Rule "+outi+" is : ");
-        if (show) or.print()
-    }
 
     print("\nAttaching builtins to database.\n");
     outr.builtin = {};
@@ -67,24 +59,47 @@ function freeform() {
     outr.builtin["external2/3"] = ExternalAndParse;
     print("Attachments done.\n");
 
-    print("\nParsing query.\n");
-    currentRule = query + "   # query";
-    let terms = ParseBody(new Tokeniser(query));
-    if (terms == null) {
-        print("An error occurred parsing the query.\n");
-        return;
-    }
-    const body = new Body(terms);
-    if (show) {
-        print("Query is: ");
-        body.print();
-        print("\n\n");
+    print("Parsing rulesets.\n");
+    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
+        //console.log("Line", currentLineNumber + 1);
+        currentRule = rules[currentLineNumber];
+        if (currentRule.substring(0, 1) == ops.comment || currentRule == "") continue;
+        var or = ParseRule(new Tokeniser(currentRule));
+        if (or == null) continue;
+        if (or.asking) console.log('queryy')
+        outr[outi++] = or;
+        // print ("Rule "+outi+" is : ");
+        if (show) or.print()
+        if (or.asking) {
+            const body = or.body;
+            if (show) {
+                print("Query is: ");
+                body.print();
+                print("\n\n");
+            }
+            var vs = varNames(body.list);
+            prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
+        }
     }
 
-    var vs = varNames(body.list);
+    // print("\nParsing query.\n");
+    // currentRule = query + "   "+ops.comment+" query";
+    // let terms = ParseBody(new Tokeniser(query));
+    // if (terms == null) {
+    //     print("An error occurred parsing the query.\n");
+    //     return;
+    // }
+    // const body = new Body(terms);
+    // if (show) {
+    //     print("Query is: ");
+    //     body.print();
+    //     print("\n\n");
+    // }
 
-    // Prove the query.
-    prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
+    // var vs = varNames(body.list);
+
+    // // Prove the query.
+    // prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
 }
 
 // Functional programming bits... Currying and suchlike
@@ -406,7 +421,7 @@ class Term {
                 return;
             }
         }
-        print(ops.open + this.name + ", ");
+        print(ops.open + this.name);
         this.partlist.print();
         print(ops.close);
     };
@@ -421,9 +436,10 @@ class Partlist {
 
     print() {
         for (var i = 0; i < this.list.length; i++) {
+            print(", ");
             this.list[i].print();
-            if (i < this.list.length - 1)
-                print(", ");
+            // if (i < this.list.length - 1)
+            //     print(", ");
         }
     };
 }
@@ -447,24 +463,26 @@ class Body {
 class Rule {
     head: Term;
     body: Body | null;
+    asking: boolean;
 
-    constructor(head: Term, bodylist: Term[] | null = null) {
+    constructor(head: Term, bodylist: Term[] | null = null, isQuestion: boolean = false) {
         this.head = head;
         if (bodylist != null)
             this.body = new Body(bodylist);
         else
             this.body = null;
+        this.asking = isQuestion;
     }
 
     print() {
         if (this.body == null) {
             this.head.print();
-            print(".\n");
+            print(ops.endSentence + "\n");
         } else {
             this.head.print();
-            print(" :- ");
+            print(" " + ops.if + " ");
             this.body.print();
-            print(".\n");
+            print(ops.endSentence + "\n");
         }
     }
 
@@ -498,8 +516,8 @@ class Tokeniser {
             return this;
         }
 
-        // punctuation   {  }  .  ,  [  ]  |  !  :-
-        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-)(.*)$/);
+        // punctuation   {  }  .  ,  [  ]  |  !  :- ?-
+        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-|\?\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
@@ -568,27 +586,38 @@ function ParseRule(tk: Tokeniser): Rule | null {
     var h = ParseHead(tk);
     if (!h) return null;
 
-    if (tk.current == ".") {
+    if (tk.current == ops.endSentence) {
         // A simple rule.
         return new Rule(h);
     }
 
-    if (tk.current != ":-") return null;
+    const isQuestion = tk.current == ops.query;
+    if (tk.current != ops.if && !isQuestion) return null;
     tk = tk.consume();
     var b = ParseBody(tk);
 
-    if (tk.current != ".") return null;
+    if (tk.current != ops.endSentence && tk.current != ops.endQuestion && tk.current != ops.comment && !isQuestion) {
+        console.error("expected", ops.endSentence, " but remaining:", tk.remainder)
+        return null;
+    }
 
-    return new Rule(h, b);
+    return new Rule(h, b, isQuestion);
 }
 
 function ParseHead(tk: Tokeniser): Term | null {
+
+    // is query? so, no head.
+    if (tk.type == 'punc' && tk.current == ops.query) {
+        return new Term(ops.query, []);
+    }
+
     // A head is simply a term. (errors cascade back up)
     return ParseTerm(tk);
 }
 
 function ParseTerm(tk: Tokeniser): Term | null {
     // Term -> [NOTTHIS] id ( optParamList )
+
 
     if (tk.type == "punc" && tk.current == "!") {
         // Parse ! as cut/0

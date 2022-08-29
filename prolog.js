@@ -12,21 +12,7 @@ function freeform() {
     var rules = document.rules.rules.value.split("\n");
     var show = document.input.showparse.checked;
     var query = document.input.query.value;
-    print("Parsing rulesets.\n");
     var outr = [], outi = 0;
-    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
-        //console.log("Line", currentLineNumber + 1);
-        currentRule = rules[currentLineNumber];
-        if (currentRule.substring(0, 1) == "#" || currentRule == "")
-            continue;
-        var or = ParseRule(new Tokeniser(currentRule));
-        if (or == null)
-            continue;
-        outr[outi++] = or;
-        // print ("Rule "+outi+" is : ");
-        if (show)
-            or.print();
-    }
     print("\nAttaching builtins to database.\n");
     outr.builtin = {};
     outr.builtin["compare/3"] = Comparitor;
@@ -37,22 +23,48 @@ function freeform() {
     outr.builtin["external/3"] = ExternalJS;
     outr.builtin["external2/3"] = ExternalAndParse;
     print("Attachments done.\n");
-    print("\nParsing query.\n");
-    currentRule = query + "   # query";
-    let terms = ParseBody(new Tokeniser(query));
-    if (terms == null) {
-        print("An error occurred parsing the query.\n");
-        return;
+    print("Parsing rulesets.\n");
+    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
+        //console.log("Line", currentLineNumber + 1);
+        currentRule = rules[currentLineNumber];
+        if (currentRule.substring(0, 1) == "#" /* comment */ || currentRule == "")
+            continue;
+        var or = ParseRule(new Tokeniser(currentRule));
+        if (or == null)
+            continue;
+        if (or.asking)
+            console.log('queryy');
+        outr[outi++] = or;
+        // print ("Rule "+outi+" is : ");
+        if (show)
+            or.print();
+        if (or.asking) {
+            const body = or.body;
+            if (show) {
+                print("Query is: ");
+                body.print();
+                print("\n\n");
+            }
+            var vs = varNames(body.list);
+            prove(renameVariables(body.list, 0, []), {}, outr, 1, applyOne(printVars, vs));
+        }
     }
-    const body = new Body(terms);
-    if (show) {
-        print("Query is: ");
-        body.print();
-        print("\n\n");
-    }
-    var vs = varNames(body.list);
-    // Prove the query.
-    prove(renameVariables(body.list, 0, []), {}, outr, 1, applyOne(printVars, vs));
+    // print("\nParsing query.\n");
+    // currentRule = query + "   "+ops.comment+" query";
+    // let terms = ParseBody(new Tokeniser(query));
+    // if (terms == null) {
+    //     print("An error occurred parsing the query.\n");
+    //     return;
+    // }
+    // const body = new Body(terms);
+    // if (show) {
+    //     print("Query is: ");
+    //     body.print();
+    //     print("\n\n");
+    // }
+    // var vs = varNames(body.list);
+    // // Prove the query.
+    // prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
 }
 // Functional programming bits... Currying and suchlike
 function applyOne(f, arg1) {
@@ -335,7 +347,7 @@ class Term {
                 return;
             }
         }
-        print("[" /* open */ + this.name + ", ");
+        print("[" /* open */ + this.name);
         this.partlist.print();
         print("]" /* close */);
     }
@@ -347,9 +359,10 @@ class Partlist {
     }
     print() {
         for (var i = 0; i < this.list.length; i++) {
+            print(", ");
             this.list[i].print();
-            if (i < this.list.length - 1)
-                print(", ");
+            // if (i < this.list.length - 1)
+            //     print(", ");
         }
     }
     ;
@@ -367,23 +380,24 @@ class Body {
     }
 }
 class Rule {
-    constructor(head, bodylist = null) {
+    constructor(head, bodylist = null, isQuestion = false) {
         this.head = head;
         if (bodylist != null)
             this.body = new Body(bodylist);
         else
             this.body = null;
+        this.asking = isQuestion;
     }
     print() {
         if (this.body == null) {
             this.head.print();
-            print(".\n");
+            print("." /* endSentence */ + "\n");
         }
         else {
             this.head.print();
-            print(" :- ");
+            print(" " + ":-" /* if */ + " ");
             this.body.print();
-            print(".\n");
+            print("." /* endSentence */ + "\n");
         }
     }
 }
@@ -408,8 +422,8 @@ class Tokeniser {
             this.type = "eof";
             return this;
         }
-        // punctuation   {  }  .  ,  [  ]  |  !  :-
-        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-)(.*)$/);
+        // punctuation   {  }  .  ,  [  ]  |  !  :- ?-
+        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-|\?\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
@@ -470,19 +484,26 @@ function ParseRule(tk) {
     var h = ParseHead(tk);
     if (!h)
         return null;
-    if (tk.current == ".") {
+    if (tk.current == "." /* endSentence */) {
         // A simple rule.
         return new Rule(h);
     }
-    if (tk.current != ":-")
+    const isQuestion = tk.current == "?-" /* query */;
+    if (tk.current != ":-" /* if */ && !isQuestion)
         return null;
     tk = tk.consume();
     var b = ParseBody(tk);
-    if (tk.current != ".")
+    if (tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && tk.current != "#" /* comment */ && !isQuestion) {
+        console.error("expected", "." /* endSentence */, " but remaining:", tk.remainder);
         return null;
-    return new Rule(h, b);
+    }
+    return new Rule(h, b, isQuestion);
 }
 function ParseHead(tk) {
+    // is query? so, no head.
+    if (tk.type == 'punc' && tk.current == "?-" /* query */) {
+        return new Term("?-" /* query */, []);
+    }
     // A head is simply a term. (errors cascade back up)
     return ParseTerm(tk);
 }
