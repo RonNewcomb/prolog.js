@@ -1,4 +1,3 @@
-//}
 function cls() {
     document.output.output.value = "";
 }
@@ -319,7 +318,7 @@ class Term {
             }
             if ((x.type == "Atom" && x.name == "nil") || x.type == "Variable") {
                 x = this;
-                print("{");
+                print("{" /* openList */);
                 var com = false;
                 while (x.type == "Term" && x.name == "cons" && x.partlist.list.length == 2) {
                     if (com)
@@ -329,16 +328,16 @@ class Term {
                     x = x.partlist.list[1];
                 }
                 if (x.type == "Variable") {
-                    print(" | ");
+                    print(" " + "|" /* sliceList */ + " ");
                     x.print();
                 }
-                print("}");
+                print("}" /* closeList */);
                 return;
             }
         }
-        print("[" + this.name + ", ");
+        print("[" /* open */ + this.name + ", ");
         this.partlist.print();
-        print("]");
+        print("]" /* close */);
     }
     ;
 }
@@ -499,7 +498,7 @@ function ParseTerm(tk) {
         notthis = true;
         tk = tk.consume();
     }
-    if (tk.type != "punc" || tk.current != '[') {
+    if (tk.type != "punc" || tk.current != "[" /* open */) {
         console.error("expected [ to begin");
         return null;
     }
@@ -550,11 +549,11 @@ function ParsePart(tk) {
         tk = tk.consume();
         return new Variable(n);
     }
-    if (tk.type == "punc" && tk.current == "{") {
+    if (tk.type == "punc" && tk.current == "{" /* openList */) {
         tk = tk.consume();
         // destructure a list
         // Special case: {} = new atom(nil).
-        if (tk.type == "punc" && tk.current == "}") {
+        if (tk.type == "punc" && tk.current == "}" /* closeList */) {
             tk = tk.consume();
             return new Atom("nil");
         }
@@ -573,10 +572,10 @@ function ParsePart(tk) {
         }
         // Find the end of the list ... "| Var }" or "}".
         var append;
-        if (tk.current == "|") {
+        if (tk.current == "|" /* sliceList */) {
             tk = tk.consume();
             if (tk.type != "var") {
-                console.error("| wasn't followed by a var");
+                console.error("|" /* sliceList */, " wasn't followed by a var");
                 return null;
             }
             append = new Variable(tk.current);
@@ -585,7 +584,7 @@ function ParsePart(tk) {
         else {
             append = new Atom("nil");
         }
-        if (tk.current != "}") {
+        if (tk.current != "}" /* closeList */) {
             console.error("list destructure wasn't ended by }");
             return null;
         }
@@ -595,7 +594,7 @@ function ParsePart(tk) {
             append = new Term("cons", [l[i], append]);
         return append;
     }
-    const openbracket = (tk.type == 'punc' && tk.current == '[');
+    const openbracket = (tk.type == 'punc' && tk.current == "[" /* open */);
     if (openbracket)
         tk = tk.consume();
     var name = tk.current;
@@ -609,7 +608,7 @@ function ParsePart(tk) {
     tk = tk.consume();
     var p = [];
     var i = 0;
-    while (tk.current != "]") {
+    while (tk.current != "]" /* close */) {
         if (tk.type == "eof")
             return null;
         var part = ParsePart(tk);
@@ -617,7 +616,7 @@ function ParsePart(tk) {
             return null;
         if (tk.current == ",")
             tk = tk.consume();
-        else if (tk.current != "]")
+        else if (tk.current != "]" /* close */)
             return null;
         // Add the current Part onto the list...
         p[i++] = part;
@@ -629,10 +628,10 @@ function ParseBody(tk) {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
-    console.log("body: ");
+    // console.log("body: ");
     var t;
     while ((t = ParseTerm(tk)) != null) {
-        console.log("body term");
+        // console.log("body term");
         p[i++] = t;
         if (tk.current != ",")
             break;

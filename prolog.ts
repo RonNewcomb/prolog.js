@@ -7,6 +7,15 @@ interface Document {
 }
 //}
 
+// these aren't used in the regexes in  class Tokeniser !!
+const enum ops {
+    open = '[',
+    close = ']',
+    openList = '{',
+    closeList = '}',
+    sliceList = '|',
+}
+
 function cls() {
     document.output.output.value = "";
 }
@@ -381,7 +390,7 @@ class Term {
             }
             if ((x.type == "Atom" && x.name == "nil") || x.type == "Variable") {
                 x = this;
-                print("{");
+                print(ops.openList);
                 var com = false;
                 while (x.type == "Term" && x.name == "cons" && (x as Term).partlist.list.length == 2) {
                     if (com) print(", ");
@@ -390,16 +399,16 @@ class Term {
                     x = (x as Term).partlist.list[1];
                 }
                 if (x.type == "Variable") {
-                    print(" | ");
+                    print(" " + ops.sliceList + " ");
                     x.print();
                 }
-                print("}");
+                print(ops.closeList);
                 return;
             }
         }
-        print("[" + this.name + ", ");
+        print(ops.open + this.name + ", ");
         this.partlist.print();
-        print("]");
+        print(ops.close);
     };
 }
 
@@ -593,7 +602,7 @@ function ParseTerm(tk: Tokeniser): Term | null {
         tk = tk.consume();
     }
 
-    if (tk.type != "punc" || tk.current != '[') {
+    if (tk.type != "punc" || tk.current != ops.open) {
         console.error("expected [ to begin");
         return null;
     }
@@ -650,13 +659,13 @@ function ParsePart(tk: Tokeniser): Part | null {
         return new Variable(n!);
     }
 
-    if (tk.type == "punc" && tk.current == "{") {
+    if (tk.type == "punc" && tk.current == ops.openList) {
         tk = tk.consume();
 
         // destructure a list
 
         // Special case: {} = new atom(nil).
-        if (tk.type == "punc" && tk.current == "}") {
+        if (tk.type == "punc" && tk.current == ops.closeList) {
             tk = tk.consume();
             return new Atom("nil");
         }
@@ -678,10 +687,10 @@ function ParsePart(tk: Tokeniser): Part | null {
 
         // Find the end of the list ... "| Var }" or "}".
         var append;
-        if (tk.current == "|") {
+        if (tk.current == ops.sliceList) {
             tk = tk.consume();
             if (tk.type != "var") {
-                console.error("| wasn't followed by a var");
+                console.error(ops.sliceList, " wasn't followed by a var");
                 return null;
             }
             append = new Variable(tk.current!);
@@ -689,7 +698,7 @@ function ParsePart(tk: Tokeniser): Part | null {
         } else {
             append = new Atom("nil");
         }
-        if (tk.current != "}") {
+        if (tk.current != ops.closeList) {
             console.error("list destructure wasn't ended by }");
             return null;
         }
@@ -699,7 +708,7 @@ function ParsePart(tk: Tokeniser): Part | null {
         return append;
     }
 
-    const openbracket = (tk.type == 'punc' && tk.current == '[')
+    const openbracket = (tk.type == 'punc' && tk.current == ops.open)
     if (openbracket) tk = tk.consume();
 
     var name = tk.current;
@@ -715,14 +724,14 @@ function ParsePart(tk: Tokeniser): Part | null {
 
     var p = [];
     var i = 0;
-    while (tk.current != "]") {
+    while (tk.current != ops.close) {
         if (tk.type == "eof") return null;
 
         var part = ParsePart(tk);
         if (part == null) return null;
 
         if (tk.current == ",") tk = tk.consume();
-        else if (tk.current != "]") return null;
+        else if (tk.current != ops.close) return null;
 
         // Add the current Part onto the list...
         p[i++] = part;
@@ -736,11 +745,11 @@ function ParseBody(tk: Tokeniser): Term[] | null {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
-    console.log("body: ");
+    // console.log("body: ");
 
     var t;
     while ((t = ParseTerm(tk)) != null) {
-        console.log("body term");
+        // console.log("body term");
         p[i++] = t;
         if (tk.current != ",") break;
         tk = tk.consume();
