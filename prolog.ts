@@ -24,10 +24,11 @@ const enum ops {
 
 const consoleOutEl: HTMLDivElement = document.getElementById('consoleout')! as HTMLDivElement;
 
-function newConsoleLine() {
+function newConsoleLine(): HTMLDivElement {
     var elemDiv = document.createElement('div');
     elemDiv.innerHTML = '&nbsp;';
     consoleOutEl.appendChild(elemDiv);
+    return elemDiv;
 }
 
 function print(str: string | number) {
@@ -40,6 +41,13 @@ function print(str: string | number) {
         consoleOutEl.lastElementChild!.append(line);
         if (multiline) newConsoleLine();
     }
+}
+
+function consoleOutError(...rest: (any)[]) {
+    const div = newConsoleLine();
+    div.classList.add('errdiv');
+    div.innerHTML = '<span class=err>' + rest.join(' ') + '</span>';
+    newConsoleLine();
 }
 
 type FunctorResult = null | boolean;
@@ -442,13 +450,13 @@ class Term {
         }
 
         if (tk.type != "punc" || tk.current != ops.open) {
-            console.error("expected [ to begin");
+            consoleOutError("expected [ to begin");
             return null;
         }
         tk = tk.consume();
 
         if (tk.type != "id") {
-            console.error("expected first term to be a symbol / bare word")
+            consoleOutError("expected first term to be a symbol / bare word")
             return null;
         }
         const name = tk.current;
@@ -456,7 +464,7 @@ class Term {
 
         if (tk.current == ",") tk = tk.consume();
         else if (tk.current != "]") {
-            console.error("expected , or ] after first term. Current=", tk.current);
+            consoleOutError("expected , or ] after first term. Current=", tk.current);
             return null;
         }
 
@@ -464,13 +472,13 @@ class Term {
         let i = 0;
         while (tk.current != "]") {
             if (tk.type == "eof") {
-                console.error('unexpected EOF while running through terms until ]')
+                consoleOutError('unexpected EOF while running through terms until ]')
                 return null;
             }
 
             const part = Partlist.parse1(tk);
             if (part == null) {
-                console.error("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
+                consoleOutError("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
                 return null;
             }
 
@@ -532,7 +540,7 @@ class Partlist {
             while (true) {
                 const part = Partlist.parse1(tk);
                 if (part == null) {
-                    console.error("subpart didn't parse:", tk.current);
+                    consoleOutError("subpart didn't parse:", tk.current);
                     return null;
                 }
 
@@ -546,7 +554,7 @@ class Partlist {
             if (tk.current == ops.sliceList) {
                 tk = tk.consume();
                 if (tk.type != "var") {
-                    console.error(ops.sliceList, " wasn't followed by a var");
+                    consoleOutError(ops.sliceList, " wasn't followed by a var");
                     return null;
                 }
                 append = new Variable(tk.current!);
@@ -555,7 +563,7 @@ class Partlist {
                 append = new Atom("nil");
             }
             if (tk.current != ops.closeList) {
-                console.error("list destructure wasn't ended by }");
+                consoleOutError("list destructure wasn't ended by }");
                 return null;
             }
             tk = tk.consume();
@@ -573,7 +581,7 @@ class Partlist {
         if (!openbracket) return new Atom(name!);
 
         if (tk.current != ',') {
-            console.error("expected , after symbol");
+            consoleOutError("expected , after symbol");
             return null;
         }
         tk = tk.consume();
@@ -658,7 +666,7 @@ class Rule {
         const b = Rule.parseBody(tk);
 
         if (tk.current != ops.endSentence && tk.current != ops.endQuestion && tk.current != ops.comment && !isQuestion) {
-            console.error("expected", ops.endSentence, " but remaining:", tk.remainder)
+            consoleOutError("expected", ops.endSentence, " but remaining:", tk.remainder)
             return null;
         }
 

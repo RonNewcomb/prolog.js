@@ -3,6 +3,7 @@ function newConsoleLine() {
     var elemDiv = document.createElement('div');
     elemDiv.innerHTML = '&nbsp;';
     consoleOutEl.appendChild(elemDiv);
+    return elemDiv;
 }
 function print(str) {
     console.log(str);
@@ -16,6 +17,12 @@ function print(str) {
         if (multiline)
             newConsoleLine();
     }
+}
+function consoleOutError(...rest) {
+    const div = newConsoleLine();
+    div.classList.add('errdiv');
+    div.innerHTML = '<span class=err>' + rest.join(' ') + '</span>';
+    newConsoleLine();
 }
 const database = [];
 // called from HTML
@@ -367,12 +374,12 @@ class Term {
             tk = tk.consume();
         }
         if (tk.type != "punc" || tk.current != "[" /* open */) {
-            console.error("expected [ to begin");
+            consoleOutError("expected [ to begin");
             return null;
         }
         tk = tk.consume();
         if (tk.type != "id") {
-            console.error("expected first term to be a symbol / bare word");
+            consoleOutError("expected first term to be a symbol / bare word");
             return null;
         }
         const name = tk.current;
@@ -380,19 +387,19 @@ class Term {
         if (tk.current == ",")
             tk = tk.consume();
         else if (tk.current != "]") {
-            console.error("expected , or ] after first term. Current=", tk.current);
+            consoleOutError("expected , or ] after first term. Current=", tk.current);
             return null;
         }
         const parts = [];
         let i = 0;
         while (tk.current != "]") {
             if (tk.type == "eof") {
-                console.error('unexpected EOF while running through terms until ]');
+                consoleOutError('unexpected EOF while running through terms until ]');
                 return null;
             }
             const part = Partlist.parse1(tk);
             if (part == null) {
-                console.error("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
+                consoleOutError("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
                 return null;
             }
             if (tk.current == ",")
@@ -443,7 +450,7 @@ class Partlist {
             while (true) {
                 const part = Partlist.parse1(tk);
                 if (part == null) {
-                    console.error("subpart didn't parse:", tk.current);
+                    consoleOutError("subpart didn't parse:", tk.current);
                     return null;
                 }
                 parts[i++] = part;
@@ -456,7 +463,7 @@ class Partlist {
             if (tk.current == "|" /* sliceList */) {
                 tk = tk.consume();
                 if (tk.type != "var") {
-                    console.error("|" /* sliceList */, " wasn't followed by a var");
+                    consoleOutError("|" /* sliceList */, " wasn't followed by a var");
                     return null;
                 }
                 append = new Variable(tk.current);
@@ -466,7 +473,7 @@ class Partlist {
                 append = new Atom("nil");
             }
             if (tk.current != "}" /* closeList */) {
-                console.error("list destructure wasn't ended by }");
+                consoleOutError("list destructure wasn't ended by }");
                 return null;
             }
             tk = tk.consume();
@@ -483,7 +490,7 @@ class Partlist {
         if (!openbracket)
             return new Atom(name);
         if (tk.current != ',') {
-            console.error("expected , after symbol");
+            consoleOutError("expected , after symbol");
             return null;
         }
         tk = tk.consume();
@@ -555,7 +562,7 @@ class Rule {
         tk = tk.consume();
         const b = Rule.parseBody(tk);
         if (tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && tk.current != "#" /* comment */ && !isQuestion) {
-            console.error("expected", "." /* endSentence */, " but remaining:", tk.remainder);
+            consoleOutError("expected", "." /* endSentence */, " but remaining:", tk.remainder);
             return null;
         }
         return new Rule(h, b, isQuestion);
