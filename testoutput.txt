@@ -1,41 +1,47 @@
-Parsing rulesets.
-triple(sc, a, b).
-triple(sc, b, c).
-triple(sc, c, d).
-triple(sc, d, e).
-triple(sc, e, f).
-triple(sc, f, g).
-triple(type, sc, transitive).
-triple(P, X, Y) :- triple(type, P, transitive), triple(P, X, Z), triple(P, Z, Y).
-unify(X, X).
-conjunction(nil).
-conjunction([X | Rest]) :- call(X), conjunction(Rest).
-disjunction([X | Rest]) :- call(X).
-disjunction([X | Rest]) :- disjunction(Rest).
-add(A, B, C) :- external("$1 + $2", [A, B], C).
-sub(A, B, C) :- external("$1 - $2", [A, B], C).
-mul(A, B, C) :- external("$1 * $2", [A, B], C).
-div(A, B, C) :- external("$1 / $2", [A, B], C).
-qsort(nil, nil).
-qsort([X | Rest], Answer) :- partition(X, Rest, nil, Before, nil, After), qsort(Before, Bsort), qsort(After, Asort), append(Bsort, [X | Asort], Answer).
-partition(X, nil, Before, Before, After, After).
-partition(X, [Y | Rest], B, [Y | Brest], A, Arest) :- leq(X, Y), partition(X, Rest, B, Brest, A, Arest).
-partition(X, [Y | Rest], B, Brest, A, [Y | Arest]) :- gtr(X, Y), partition(X, Rest, B, Brest, A, Arest).
-leq(X, Y) :- compare(X, Y, gt).
-leq(X, Y) :- compare(X, Y, eq).
-gtr(X, Y) :- compare(X, Y, lt).
-append(nil, Z, Z).
-append([A | B], Z, [A | ZZ]) :- append(B, Z, ZZ).
-reverse(nil, nil).
-reverse([A | B], Z) :- reverse(B, Brev), append(Brev, [A], Z).
-length(nil, 0).
-length([H | T], N) :- length(T, M), add(M, 1, N).
-not(Term).
-varTest(a).
-tarTest(b).
 
 Attaching builtins to database.
 Attachments done.
+Parsing rulesets.
+[unify, X, X].
+[conjunction, nil].
+[conjunction, {X | Rest}] :- [call, X], [conjunction, Rest].
+[disjunction, {X | Rest}] :- [call, X].
+[disjunction, {X | Rest}] :- [disjunction, Rest].
+[add, A, B, C] :- [external, "$1 + $2", {A, B}, C].
+[sub, A, B, C] :- [external, "$1 - $2", {A, B}, C].
+[mul, A, B, C] :- [external, "$1 * $2", {A, B}, C].
+[div, A, B, C] :- [external, "$1 / $2", {A, B}, C].
+[qsort, nil, nil].
+[qsort, {X | Rest}, Answer] :- [partition, X, Rest, nil, Before, nil, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer].
+[partition, X, nil, Before, Before, After, After].
+[partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] :- [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest].
+[partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] :- [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest].
+[leq, X, Y] :- [compare, X, Y, gt].
+[leq, X, Y] :- [compare, X, Y, eq].
+[gtr, X, Y] :- [compare, X, Y, lt].
+[append, nil, Z, Z].
+[append, {A | B}, Z, {A | ZZ}] :- [append, B, Z, ZZ].
+[reverse, nil, nil].
+[reverse, {A | B}, Z] :- [reverse, B, Brev], [append, Brev, {A}, Z].
+[length, nil, 0].
+[length, {H | T}, N] :- [length, T, M], [add, M, 1, N].
+[not, Term] :- [call, Term], [cut], [fail].
+[not, Term].
+[var, X] :- [bagof, l, [varTest, X], {l, l}].
+[varTest, a].
+[tarTest, b].
+[triple, sc, a, b].
+[triple, sc, b, c].
+[triple, sc, c, d].
+[triple, sc, d, e].
+[triple, sc, e, f].
+[triple, sc, f, g].
+[triple, type, sc, transitive].
+[triple, P, X, Y] :- [triple, type, P, transitive], [triple, P, X, Z], [triple, P, Z, Y].
+[arcsOut, X, L] :- [bagof, O, [triple, P, X, O], L].
+ ?- [bagof, c, [triple, sc, A, B], L], [length, L, N].
+A = A.0
+B = B.0
+L = {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}
+N = 21
 
-Parsing query.
-An error occurred parsing the query.

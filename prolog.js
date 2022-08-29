@@ -9,9 +9,10 @@ var currentLineNumber = 0;
 var currentRule = '';
 function freeform() {
     cls();
-    var rules = document.rules.rules.value.split("\n");
-    var show = document.input.showparse.checked;
-    var outr = [], outi = 0;
+    const rules = document.rules.rules.value.split("\n");
+    const show = document.input.showparse.checked;
+    const outr = [];
+    let outi = 0;
     print("\nAttaching builtins to database.\n");
     outr.builtin = {};
     outr.builtin["compare/3"] = Comparitor;
@@ -24,28 +25,19 @@ function freeform() {
     print("Attachments done.\n");
     print("Parsing rulesets.\n");
     for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
-        //console.log("Line", currentLineNumber + 1);
         currentRule = rules[currentLineNumber];
-        if (currentRule.substring(0, 1) == "#" /* comment */ || currentRule == "")
+        if (currentRule.substring(0, 1) == "#" /* comment */ || currentRule == "" || currentRule.match(/^\s*$/))
             continue;
         const or = ParseRule(new Tokeniser(currentRule));
         if (or == null)
             continue;
-        if (or.asking)
-            console.log('queryy');
         outr[outi++] = or;
         // print ("Rule "+outi+" is : ");
         if (show)
             or.print();
         if (or.asking) {
-            const body = or.body;
-            if (show) {
-                print("Query is: ");
-                body.print();
-                print("\n\n");
-            }
-            const vs = varNames(body.list);
-            answerQuestion(renameVariables(body.list, 0, []), {}, outr, 1, applyOne(printVars, vs));
+            const vs = varNames(or.body.list);
+            answerQuestion(renameVariables(or.body.list, 0, []), {}, outr, 1, applyOne(printVars, vs));
         }
     }
 }
@@ -631,10 +623,8 @@ function ParseBody(tk) {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
-    // console.log("body: ");
     var t;
     while ((t = ParseTerm(tk)) != null) {
-        // console.log("body term");
         p[i++] = t;
         if (tk.current != ",")
             break;

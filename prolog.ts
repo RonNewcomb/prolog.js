@@ -43,9 +43,10 @@ var currentRule = '';
 function freeform() {
     cls();
 
-    var rules: string[] = document.rules.rules.value.split("\n");
-    var show = document.input.showparse.checked;
-    var outr = [] as Database, outi = 0;
+    const rules: string[] = document.rules.rules.value.split("\n");
+    const show: boolean = document.input.showparse.checked;
+    const outr = [] as Database;
+    let outi = 0;
 
     print("\nAttaching builtins to database.\n");
     outr.builtin = {};
@@ -60,19 +61,16 @@ function freeform() {
 
     print("Parsing rulesets.\n");
     for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
-        //console.log("Line", currentLineNumber + 1);
         currentRule = rules[currentLineNumber];
-        if (currentRule.substring(0, 1) == ops.comment || currentRule == "") continue;
+        if (currentRule.substring(0, 1) == ops.comment || currentRule == "" || currentRule.match(/^\s*$/)) continue;
         const or = ParseRule(new Tokeniser(currentRule));
         if (or == null) continue;
-        if (or.asking) console.log('queryy')
         outr[outi++] = or;
         // print ("Rule "+outi+" is : ");
         if (show) or.print()
         if (or.asking) {
-            const body = or.body;
-            const vs = varNames(body.list);
-            answerQuestion(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
+            const vs = varNames(or.body.list);
+            answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
         }
     }
 }
@@ -747,11 +745,9 @@ function ParseBody(tk: Tokeniser): Term[] | null {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
-    // console.log("body: ");
 
     var t;
     while ((t = ParseTerm(tk)) != null) {
-        // console.log("body term");
         p[i++] = t;
         if (tk.current != ",") break;
         tk = tk.consume();
