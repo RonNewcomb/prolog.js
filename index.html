@@ -6,15 +6,13 @@
   <body>
     <h1>Prolog in Javascript</h1>
 
-    <p>Here we collect the accumulated library functions of the previous versions.</p>
-
     <p>This prolog is enhanced with the JavaScript callout capability though a rudimentary external/3 call; see the arithmetic functions for examples.</p>
 
-    <p>
+    <!--
       Having said that... I'm always interested to hear what people are up to with this, so if you feel keen or want a natter, drop me a line: logic@ioctl.org.
       I think that ideas are more important than kudos, but if you want to credit then I won't blush and I'm sure my employer at the time I wrote this, the
       University of Bristol, wouldn't mind you mentioning them.
-    </p>
+    -->
 
     <p>Good luck!</p>
 
@@ -23,19 +21,6 @@
     <form name="rules" action="javascript:return false;">
       <p>
         <textarea style="width: 100%; height: 100vh" name="rules">
-# Enter your ruleset in here.
-[triple, sc, a, b].
-[triple, sc, b, c].
-[triple, sc, c, d].
-[triple, sc, d, e].
-[triple, sc, e, f].
-[triple, sc, f, g].
-[triple, type, sc, transitive].
-
-[triple, P, X, Y] :- NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
-
-[arcsOut, X, L] :- [bagof, O, [triple, P, X, O], L].
-
 ### Accumulated standard library lives under here!
 
 # unification and [ x, y, z; w ] support
@@ -59,7 +44,6 @@
 # The canonical quicksort
 [qsort, {}, {}].
 [qsort, {X|Rest}, Answer] :- [partition, X, Rest, {}, Before, {}, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer].
-
 [partition, X, {}, Before, Before, After, After].
 [partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] :- [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest].
 [partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] :- [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest].
@@ -87,19 +71,30 @@
 [varTest, a].
 [tarTest, b].
 
-?- [bagof, c, [triple, sc, A, B], L], [length, L, N] # L should have 21 elements
+#
+# 
+# Enter your ruleset in here.
+[triple, sc, a, b].
+[triple, sc, b, c].
+[triple, sc, c, d].
+[triple, sc, d, e].
+[triple, sc, e, f].
+[triple, sc, f, g].
+[triple, type, sc, transitive].
+
+[triple, P, X, Y] :- NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
+
+[arcsOut, X, L] :- [bagof, O, [triple, P, X, O], L].
+
+?- [bagof, c, [triple, sc, A, B], L], [length, L, N]           # L should have 21 elements
 
 </textarea
         >
       </p>
     </form>
-    <form name="input" action="javascript:freeform(); //">
-      <p>Enter your query:</p>
-      <p><input type="text" name="query" value="[bagof, c, [triple, sc, A, B], L], [length, L, N] # L should have 21 elements" size="90" /></p>
-      <p>
-        <input type="button" value="Run query" onclick="freeform(); return true;" />
-        <input type="checkbox" name="showparse" /> Show parse results
-      </p>
+    <form name="input" action="javascript:freeform();">
+      <input type="submit" value="Run query" />
+      <input type="checkbox" name="showparse" checked /> Show parse results
     </form>
     <form name="output" action="javascript:return false;">
       <p>

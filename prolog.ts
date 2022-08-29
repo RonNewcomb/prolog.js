@@ -45,7 +45,6 @@ function freeform() {
 
     var rules: string[] = document.rules.rules.value.split("\n");
     var show = document.input.showparse.checked;
-    var query: string = document.input.query.value;
     var outr = [] as Database, outi = 0;
 
     print("\nAttaching builtins to database.\n");
@@ -64,7 +63,7 @@ function freeform() {
         //console.log("Line", currentLineNumber + 1);
         currentRule = rules[currentLineNumber];
         if (currentRule.substring(0, 1) == ops.comment || currentRule == "") continue;
-        var or = ParseRule(new Tokeniser(currentRule));
+        const or = ParseRule(new Tokeniser(currentRule));
         if (or == null) continue;
         if (or.asking) console.log('queryy')
         outr[outi++] = or;
@@ -72,34 +71,10 @@ function freeform() {
         if (show) or.print()
         if (or.asking) {
             const body = or.body;
-            if (show) {
-                print("Query is: ");
-                body.print();
-                print("\n\n");
-            }
-            var vs = varNames(body.list);
-            prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
+            const vs = varNames(body.list);
+            answerQuestion(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
         }
     }
-
-    // print("\nParsing query.\n");
-    // currentRule = query + "   "+ops.comment+" query";
-    // let terms = ParseBody(new Tokeniser(query));
-    // if (terms == null) {
-    //     print("An error occurred parsing the query.\n");
-    //     return;
-    // }
-    // const body = new Body(terms);
-    // if (show) {
-    //     print("Query is: ");
-    //     body.print();
-    //     print("\n\n");
-    // }
-
-    // var vs = varNames(body.list);
-
-    // // Prove the query.
-    // prove(renameVariables(body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
 }
 
 // Functional programming bits... Currying and suchlike
@@ -261,7 +236,7 @@ function varNames(list: (Variable | Term)[]): (Variable | Term)[] {
 //	(in that order, probably).
 
 // The main proving engine. Returns: null (keep going), other (drop out)
-function prove(goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
+function answerQuestion(goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
     //DEBUG: print ("in main prove...\n");
     if (goalList.length == 0) {
         reportFunction(environment);
@@ -322,14 +297,14 @@ function prove(goalList: Term[], environment: Environment, db: Database, level: 
                 if (rule.body!.list[j].excludeThis) newGoals[j].excludeRule = i;
             }
             for (k = 1; k < goalList.length; k++) newGoals[j++] = goalList[k];
-            var ret = prove(newGoals, env2, db, level + 1, reportFunction);
+            var ret = answerQuestion(newGoals, env2, db, level + 1, reportFunction);
             if (ret != null) return ret;
         } else {
             // Just prove the rest of the goallist, recursively.
             let newGoals: Term[] = [];
             var j;
             for (j = 1; j < goalList.length; j++) newGoals[j - 1] = goalList[j];
-            var ret = prove(newGoals, env2, db, level + 1, reportFunction);
+            var ret = answerQuestion(newGoals, env2, db, level + 1, reportFunction);
             if (ret != null) return ret;
         }
 
@@ -438,8 +413,6 @@ class Partlist {
         for (var i = 0; i < this.list.length; i++) {
             print(", ");
             this.list[i].print();
-            // if (i < this.list.length - 1)
-            //     print(", ");
         }
     };
 }
@@ -479,8 +452,8 @@ class Rule {
             this.head.print();
             print(ops.endSentence + "\n");
         } else {
-            this.head.print();
-            print(" " + ops.if + " ");
+            if (!this.asking) this.head.print();
+            print(" " + (this.asking ? ops.query : ops.if) + " ");
             this.body.print();
             print(ops.endSentence + "\n");
         }
@@ -830,7 +803,7 @@ function Comparitor(thisTerm: Term, goalList: Term[], environment: Environment, 
     }
 
     // Just prove the rest of the goallist, recursively.
-    return prove(goalList, env2, db, level + 1, reportFunction);
+    return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
 function Cut(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
@@ -847,7 +820,7 @@ function Cut(thisTerm: Term, goalList: Term[], environment: Environment, db: Dat
     // On the way through, we do nothing...
 
     // Just prove the rest of the goallist, recursively.
-    const ret = prove(goalList, environment, db, level + 1, reportFunction);
+    const ret = answerQuestion(goalList, environment, db, level + 1, reportFunction);
 
     // Backtracking through the 'cut' stops any further attempts to prove this subgoal.
     //print ("Debug: backtracking through cut/0: thisTerm.parent = "); thisTerm.parent.print(); print("\n");
@@ -882,7 +855,7 @@ function Call(thisTerm: Term, goalList: Term[], environment: Environment, db: Da
     for (j = 0; j < goalList.length; j++) newGoals[j + 1] = goalList[j];
 
     // Just prove the rest of the goallist, recursively.
-    return prove(newGoals, environment, db, level + 1, reportFunction);
+    return answerQuestion(newGoals, environment, db, level + 1, reportFunction);
 }
 
 function Fail(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): null {
@@ -908,7 +881,7 @@ function BagOf(thisTerm: Term, goalList: Term[], environment: Environment, db: D
     // Prove this subgoal, collecting up the environments...
     var anslist = [] as AnswerList;
     anslist.renumber = -1;
-    const ret = prove(newGoals, environment, db, level + 1, BagOfCollectFunction(collect, anslist));
+    const ret = answerQuestion(newGoals, environment, db, level + 1, BagOfCollectFunction(collect, anslist));
 
     // Turn anslist into a proper list and unify with 'into'
 
@@ -936,7 +909,7 @@ function BagOf(thisTerm: Term, goalList: Term[], environment: Environment, db: D
     }
 
     // Just prove the rest of the goallist, recursively.
-    return prove(goalList, env2, db, level + 1, reportFunction);
+    return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
 interface ReportFunction {
@@ -1021,7 +994,7 @@ function ExternalJS(thisTerm: Term, goalList: Term[], environment: Environment, 
     }
 
     // Just prove the rest of the goallist, recursively.
-    return prove(goalList, env2, db, level + 1, reportFunction);
+    return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
 function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
@@ -1083,6 +1056,6 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
     }
 
     // Just prove the rest of the goallist, recursively.
-    return prove(goalList, env2, db, level + 1, reportFunction);
+    return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
