@@ -68,7 +68,7 @@ function freeform() {
         outr[outi++] = or;
         // print ("Rule "+outi+" is : ");
         if (show) or.print()
-        if (or.asking) {
+        if (or.asking && or.body) {
             const vs = varNames(or.body.list);
             answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
         }
@@ -209,13 +209,13 @@ function renameVariables(list: Part[] | Part, level: number, parent: Term[] | Te
 
 // Return a list of all variables mentioned in a list of Terms.
 function varNames(list: Part[]): (Variable | Term)[] {
-    const out = [];
+    const out: (Variable | Term)[] = [];
 
     main: for (var i = 0; i < list.length; i++) {
         if (list[i].type == "Variable") {
             for (var j = 0; j < out.length; j++)
                 if (out[j].name == list[i].name) continue main;
-            out[out.length] = list[i];
+            out[out.length] = list[i] as Variable;
         } else if (list[i].type == "Term") {
             const o2 = varNames((list[i] as Term).partlist.list);
             inner: for (var j = 0; j < o2.length; j++) {
@@ -456,7 +456,7 @@ class Term {
         }
         tk = tk.consume();
 
-        const term = new Term(name, parts);
+        const term = new Term(name!, parts);
         if (notthis) term.excludeThis = true;
         return term;
     }
@@ -485,7 +485,7 @@ class Partlist {
         if (tk.type == "var") {
             const varName = tk.current;
             tk = tk.consume();
-            return new Variable(varName);
+            return new Variable(varName!);
         }
 
         if (tk.type == "punc" && tk.current == ops.openList) {
@@ -544,7 +544,7 @@ class Partlist {
         const name = tk.current;
         tk = tk.consume();
 
-        if (!openbracket) return new Atom(name);
+        if (!openbracket) return new Atom(name!);
 
         if (tk.current != ',') {
             console.error("expected , after symbol");
@@ -568,7 +568,7 @@ class Partlist {
         }
         tk = tk.consume();
 
-        return new Term(name, parts);
+        return new Term(name!, parts);
     }
 
 }
@@ -655,7 +655,7 @@ class Rule {
         const terms: Term[] = [];
         let i = 0;
 
-        let term: Term;
+        let term: Term | null;
         while ((term = Term.parse(tk)) != null) {
             terms[i++] = term;
             if (tk.current != ",") break;
@@ -686,7 +686,7 @@ class Tokeniser {
         if (this.type == "eof") return this;
 
         // Eat any leading WS
-        let r: RegExpMatchArray = this.remainder.match(/^\s*(.*)$/);
+        let r: RegExpMatchArray | null = this.remainder.match(/^\s*(.*)$/);
         if (r) {
             this.remainder = r[1];
         }

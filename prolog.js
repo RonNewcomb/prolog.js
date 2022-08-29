@@ -35,7 +35,7 @@ function freeform() {
         // print ("Rule "+outi+" is : ");
         if (show)
             or.print();
-        if (or.asking) {
+        if (or.asking && or.body) {
             const vs = varNames(or.body.list);
             answerQuestion(renameVariables(or.body.list, 0, []), {}, outr, 1, applyOne(printVars, vs));
         }
