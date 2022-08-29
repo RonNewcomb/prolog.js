@@ -6,6 +6,8 @@ function print(str) {
     console.log(str);
     document.output.output.value += str;
 }
+var currentLineNumber = 0;
+var currentRule = '';
 function freeform() {
     cls();
     var rules = document.rules.rules.value.split("\n");
@@ -13,11 +15,12 @@ function freeform() {
     var query = document.input.query.value;
     print("Parsing rulesets.\n");
     var outr = [], outi = 0;
-    for (var r = 0; r < rules.length; r++) {
-        var rule = rules[r];
-        if (rule.substring(0, 1) == "#" || rule == "")
+    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
+        //console.log("Line", currentLineNumber + 1);
+        currentRule = rules[currentLineNumber];
+        if (currentRule.substring(0, 1) == "#" || currentRule == "")
             continue;
-        var or = ParseRule(new Tokeniser(rule));
+        var or = ParseRule(new Tokeniser(currentRule));
         if (or == null)
             continue;
         outr[outi++] = or;
@@ -36,6 +39,7 @@ function freeform() {
     outr.builtin["external2/3"] = ExternalAndParse;
     print("Attachments done.\n");
     print("\nParsing query.\n");
+    currentRule = query + "   # query";
     let terms = ParseBody(new Tokeniser(query));
     if (terms == null) {
         print("An error occurred parsing the query.\n");
@@ -315,7 +319,7 @@ class Term {
             }
             if ((x.type == "Atom" && x.name == "nil") || x.type == "Variable") {
                 x = this;
-                print("[");
+                print("{");
                 var com = false;
                 while (x.type == "Term" && x.name == "cons" && x.partlist.list.length == 2) {
                     if (com)
@@ -328,13 +332,13 @@ class Term {
                     print(" | ");
                     x.print();
                 }
-                print("]");
+                print("}");
                 return;
             }
         }
-        print("" + this.name + "(");
+        print("[" + this.name + ", ");
         this.partlist.print();
-        print(")");
+        print("]");
     }
     ;
 }
@@ -506,23 +510,24 @@ function ParseTerm(tk) {
     }
     var name = tk.current;
     tk = tk.consume();
-    if (tk.current != ",") {
-        // fail shorthand for fail(), ie, fail/0
-        if (name == "fail") {
-            return new Term(name, []);
-        }
-        console.error("expected , after first term");
+    if (tk.current == ",")
+        tk = tk.consume();
+    else if (tk.current != "]") {
+        console.error("expected , or ] after first term. Current=", tk.current);
         return null;
     }
-    tk = tk.consume();
     var p = [];
     var i = 0;
     while (tk.current != "]") {
-        if (tk.type == "eof")
+        if (tk.type == "eof") {
+            console.error('unexpected EOF while running through terms until ]');
             return null;
+        }
         var part = ParsePart(tk);
-        if (part == null)
+        if (part == null) {
+            console.error("part didn't parse at", tk.current, " in line: ", currentRule, "\nremainder:", tk.remainder);
             return null;
+        }
         if (tk.current == ",")
             tk = tk.consume();
         else if (tk.current != "]")
@@ -545,12 +550,10 @@ function ParsePart(tk) {
         tk = tk.consume();
         return new Variable(n);
     }
-    if (tk.type != "id") {
-        if (tk.type != "punc" || tk.current != "{")
-            return null;
-        // Parse a list (syntactic sugar goes here)
+    if (tk.type == "punc" && tk.current == "{") {
         tk = tk.consume();
-        // Special case: [] = new atom(nil).
+        // destructure a list
+        // Special case: {} = new atom(nil).
         if (tk.type == "punc" && tk.current == "}") {
             tk = tk.consume();
             return new Atom("nil");
@@ -559,8 +562,10 @@ function ParsePart(tk) {
         var l = [], i = 0;
         while (true) {
             var t = ParsePart(tk);
-            if (t == null)
+            if (t == null) {
+                console.error("subpart didn't parse:", tk.current);
                 return null;
+            }
             l[i++] = t;
             if (tk.current != ",")
                 break;
@@ -570,30 +575,41 @@ function ParsePart(tk) {
         var append;
         if (tk.current == "|") {
             tk = tk.consume();
-            if (tk.type != "var")
+            if (tk.type != "var") {
+                console.error("| wasn't followed by a var");
                 return null;
+            }
             append = new Variable(tk.current);
             tk = tk.consume();
         }
         else {
             append = new Atom("nil");
         }
-        if (tk.current != "}")
+        if (tk.current != "}") {
+            console.error("list destructure wasn't ended by }");
             return null;
+        }
         tk = tk.consume();
         // Return the new cons.... of all this rubbish.
         for (--i; i >= 0; i--)
             append = new Term("cons", [l[i], append]);
         return append;
     }
+    const openbracket = (tk.type == 'punc' && tk.current == '[');
+    if (openbracket)
+        tk = tk.consume();
     var name = tk.current;
     tk = tk.consume();
-    if (tk.current != "(")
+    if (!openbracket)
         return new Atom(name);
+    if (tk.current != ',') {
+        console.error("expected , after symbol");
+        return null;
+    }
     tk = tk.consume();
     var p = [];
     var i = 0;
-    while (tk.current != ")") {
+    while (tk.current != "]") {
         if (tk.type == "eof")
             return null;
         var part = ParsePart(tk);
@@ -601,7 +617,7 @@ function ParsePart(tk) {
             return null;
         if (tk.current == ",")
             tk = tk.consume();
-        else if (tk.current != ")")
+        else if (tk.current != "]")
             return null;
         // Add the current Part onto the list...
         p[i++] = part;
@@ -613,8 +629,10 @@ function ParseBody(tk) {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
+    console.log("body: ");
     var t;
     while ((t = ParseTerm(tk)) != null) {
+        console.log("body term");
         p[i++] = t;
         if (tk.current != ",")
             break;

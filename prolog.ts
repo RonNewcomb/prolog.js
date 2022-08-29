@@ -23,6 +23,9 @@ interface Functor {
 
 type Database = Rule[] & { builtin?: { [key: string]: Functor } };
 
+var currentLineNumber = 0;
+var currentRule = '';
+
 function freeform() {
     cls();
 
@@ -33,10 +36,11 @@ function freeform() {
     print("Parsing rulesets.\n");
 
     var outr = [] as Database, outi = 0;
-    for (var r = 0; r < rules.length; r++) {
-        var rule = rules[r];
-        if (rule.substring(0, 1) == "#" || rule == "") continue;
-        var or = ParseRule(new Tokeniser(rule));
+    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
+        //console.log("Line", currentLineNumber + 1);
+        currentRule = rules[currentLineNumber];
+        if (currentRule.substring(0, 1) == "#" || currentRule == "") continue;
+        var or = ParseRule(new Tokeniser(currentRule));
         if (or == null) continue;
         outr[outi++] = or;
         // print ("Rule "+outi+" is : ");
@@ -55,6 +59,7 @@ function freeform() {
     print("Attachments done.\n");
 
     print("\nParsing query.\n");
+    currentRule = query + "   # query";
     let terms = ParseBody(new Tokeniser(query));
     if (terms == null) {
         print("An error occurred parsing the query.\n");
@@ -376,7 +381,7 @@ class Term {
             }
             if ((x.type == "Atom" && x.name == "nil") || x.type == "Variable") {
                 x = this;
-                print("[");
+                print("{");
                 var com = false;
                 while (x.type == "Term" && x.name == "cons" && (x as Term).partlist.list.length == 2) {
                     if (com) print(", ");
@@ -388,13 +393,13 @@ class Term {
                     print(" | ");
                     x.print();
                 }
-                print("]");
+                print("}");
                 return;
             }
         }
-        print("" + this.name + "(");
+        print("[" + this.name + ", ");
         this.partlist.print();
-        print(")");
+        print("]");
     };
 }
 
@@ -601,12 +606,109 @@ function ParseTerm(tk: Tokeniser): Term | null {
     var name = tk.current;
     tk = tk.consume();
 
-    if (tk.current != ",") {
-        // fail shorthand for fail(), ie, fail/0
-        if (name == "fail") {
-            return new Term(name, []);
+    if (tk.current == ",") tk = tk.consume();
+    else if (tk.current != "]") {
+        console.error("expected , or ] after first term. Current=", tk.current);
+        return null;
+    }
+
+    var p = [];
+    var i = 0;
+    while (tk.current != "]") {
+        if (tk.type == "eof") {
+            console.error('unexpected EOF while running through terms until ]')
+            return null;
         }
-        console.error("expected , after first term");
+
+        var part = ParsePart(tk);
+        if (part == null) {
+            console.error("part didn't parse at", tk.current, " in line: ", currentRule, "\nremainder:", tk.remainder);
+            return null;
+        }
+
+        if (tk.current == ",") tk = tk.consume();
+        else if (tk.current != "]") return null;
+
+        // Add the current Part onto the list...
+        p[i++] = part;
+    }
+    tk = tk.consume();
+
+    var term = new Term(name!, p);
+    if (notthis) term.excludeThis = true;
+    return term;
+}
+
+// This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
+function ParsePart(tk: Tokeniser): Part | null {
+    // Part -> var | id | id(optParamList)
+    // Part -> [ listBit ] ::-> cons(...)
+
+    if (tk.type == "var") {
+        var n = tk.current;
+        tk = tk.consume();
+        return new Variable(n!);
+    }
+
+    if (tk.type == "punc" && tk.current == "{") {
+        tk = tk.consume();
+
+        // destructure a list
+
+        // Special case: {} = new atom(nil).
+        if (tk.type == "punc" && tk.current == "}") {
+            tk = tk.consume();
+            return new Atom("nil");
+        }
+
+        // Get a list of parts into l
+        var l = [], i = 0;
+
+        while (true) {
+            var t = ParsePart(tk);
+            if (t == null) {
+                console.error("subpart didn't parse:", tk.current);
+                return null;
+            }
+
+            l[i++] = t;
+            if (tk.current != ",") break;
+            tk = tk.consume();
+        }
+
+        // Find the end of the list ... "| Var }" or "}".
+        var append;
+        if (tk.current == "|") {
+            tk = tk.consume();
+            if (tk.type != "var") {
+                console.error("| wasn't followed by a var");
+                return null;
+            }
+            append = new Variable(tk.current!);
+            tk = tk.consume();
+        } else {
+            append = new Atom("nil");
+        }
+        if (tk.current != "}") {
+            console.error("list destructure wasn't ended by }");
+            return null;
+        }
+        tk = tk.consume();
+        // Return the new cons.... of all this rubbish.
+        for (--i; i >= 0; i--) append = new Term("cons", [l[i], append]);
+        return append;
+    }
+
+    const openbracket = (tk.type == 'punc' && tk.current == '[')
+    if (openbracket) tk = tk.consume();
+
+    var name = tk.current;
+    tk = tk.consume();
+
+    if (!openbracket) return new Atom(name!);
+
+    if (tk.current != ',') {
+        console.error("expected , after symbol");
         return null;
     }
     tk = tk.consume();
@@ -627,82 +729,6 @@ function ParseTerm(tk: Tokeniser): Term | null {
     }
     tk = tk.consume();
 
-    var term = new Term(name!, p);
-    if (notthis) term.excludeThis = true;
-    return term;
-}
-
-// This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
-function ParsePart(tk: Tokeniser): Part | null {
-    // Part -> var | id | id(optParamList)
-    // Part -> [ listBit ] ::-> cons(...)
-    if (tk.type == "var") {
-        var n = tk.current;
-        tk = tk.consume();
-        return new Variable(n!);
-    }
-
-    if (tk.type != "id") {
-        if (tk.type != "punc" || tk.current != "{") return null;
-        // Parse a list (syntactic sugar goes here)
-        tk = tk.consume();
-        // Special case: [] = new atom(nil).
-        if (tk.type == "punc" && tk.current == "}") {
-            tk = tk.consume();
-            return new Atom("nil");
-        }
-
-        // Get a list of parts into l
-        var l = [], i = 0;
-
-        while (true) {
-            var t = ParsePart(tk);
-            if (t == null) return null;
-
-            l[i++] = t;
-            if (tk.current != ",") break;
-            tk = tk.consume();
-        }
-
-        // Find the end of the list ... "| Var }" or "}".
-        var append;
-        if (tk.current == "|") {
-            tk = tk.consume();
-            if (tk.type != "var") return null;
-            append = new Variable(tk.current!);
-            tk = tk.consume();
-        } else {
-            append = new Atom("nil");
-        }
-        if (tk.current != "}") return null;
-        tk = tk.consume();
-        // Return the new cons.... of all this rubbish.
-        for (--i; i >= 0; i--) append = new Term("cons", [l[i], append]);
-        return append;
-    }
-
-    var name = tk.current;
-    tk = tk.consume();
-
-    if (tk.current != "(") return new Atom(name!);
-    tk = tk.consume();
-
-    var p = [];
-    var i = 0;
-    while (tk.current != ")") {
-        if (tk.type == "eof") return null;
-
-        var part = ParsePart(tk);
-        if (part == null) return null;
-
-        if (tk.current == ",") tk = tk.consume();
-        else if (tk.current != ")") return null;
-
-        // Add the current Part onto the list...
-        p[i++] = part;
-    }
-    tk = tk.consume();
-
     return new Term(name!, p);
 }
 
@@ -710,9 +736,11 @@ function ParseBody(tk: Tokeniser): Term[] | null {
     // Body -> Term {, Term...}
     var p = [];
     var i = 0;
+    console.log("body: ");
 
     var t;
     while ((t = ParseTerm(tk)) != null) {
+        console.log("body term");
         p[i++] = t;
         if (tk.current != ",") break;
         tk = tk.consume();
