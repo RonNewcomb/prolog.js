@@ -208,7 +208,7 @@ function renameVariables(list: Part[] | Part, level: number, parent: Term[] | Te
 }
 
 // Return a list of all variables mentioned in a list of Terms.
-function varNames(list: (Variable | Term)[]): (Variable | Term)[] {
+function varNames(list: Part[]): (Variable | Term)[] {
     var out = [];
 
     main: for (var i = 0; i < list.length; i++) {
@@ -333,7 +333,7 @@ type Part = Variable | Atom | Term;
 class Variable {
     name: string;
     print: () => void;
-    type: string | 'Variable';
+    type: 'Variable';
 
     constructor(head: string) {
         this.name = head;
@@ -345,7 +345,7 @@ class Variable {
 class Atom {
     name: string;
     print: () => void;
-    type: string | 'Atom';
+    type: 'Atom';
 
     constructor(head: string) {
         this.name = head;
@@ -356,7 +356,7 @@ class Atom {
 
 class Term {
     name: string;
-    type: string;
+    type: "Term";
     partlist: Partlist;
     excludeThis?: boolean;
     excludeRule?: number;
@@ -882,7 +882,7 @@ function BagOf(thisTerm: Term, goalList: Term[], environment: Environment, db: D
     // Turn anslist into a proper list and unify with 'into'
 
     // optional here: nil anslist -> fail?
-    var answers = new Atom("nil");
+    var answers: Part = new Atom("nil");
 
     /*
     print("Debug: anslist = [");
@@ -973,7 +973,8 @@ function ExternalJS(thisTerm: Term, goalList: Term[], environment: Environment, 
 
     //print("DEBUG: External/3 about to eval \""+r+"\"\n");
 
-    var ret;
+    var ret: string;
+    // @ts-ignore
     with (EvalContext) ret = eval(r);
 
     //print("DEBUG: External/3 got "+ret+" back\n");
@@ -1033,6 +1034,7 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
     //print("DEBUG: External/3 about to eval \""+r+"\"\n");
 
     var ret: string;
+    // @ts-ignore
     with (EvalContext) ret = eval(r);
 
     //print("DEBUG: External/3 got "+ret+" back\n");
