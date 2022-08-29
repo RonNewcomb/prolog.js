@@ -21,13 +21,25 @@ const enum ops {
     comment = '#',
 }
 
-function cls() {
-    document.output.output.value = "";
+
+const consoleOutEl: HTMLDivElement = document.getElementById('consoleout')! as HTMLDivElement;
+
+function newConsoleLine() {
+    var elemDiv = document.createElement('div');
+    elemDiv.innerHTML = '&nbsp;';
+    consoleOutEl.appendChild(elemDiv);
 }
 
-function print(str: string) {
+function print(str: string | number) {
     console.log(str);
-    document.output.output.value += str;
+    if (!str) return;
+    const text = str.toString();
+    const lines = text.split('\n');
+    const multiline = lines.length > 1;
+    for (const line of lines) {
+        consoleOutEl.lastElementChild!.append(line);
+        if (multiline) newConsoleLine();
+    }
 }
 
 type FunctorResult = null | boolean;
@@ -36,43 +48,57 @@ interface Functor {
 }
 
 type Database = Rule[] & { builtin?: { [key: string]: Functor } };
+const database = [] as Database;
 
-let currentLineNumber = 0;
-let currentRule = '';
 
+// called from HTML
 function freeform() {
-    cls();
-
-    const rules: string[] = document.rules.rules.value.split("\n");
-    const show: boolean = document.input.showparse.checked;
-    const outr = [] as Database;
-    let outi = 0;
-
     print("\nAttaching builtins to database.\n");
-    outr.builtin = {};
-    outr.builtin["compare/3"] = Comparitor;
-    outr.builtin["cut/0"] = Cut;
-    outr.builtin["call/1"] = Call;
-    outr.builtin["fail/0"] = Fail;
-    outr.builtin["bagof/3"] = BagOf;
-    outr.builtin["external/3"] = ExternalJS;
-    outr.builtin["external2/3"] = ExternalAndParse;
+    database.builtin = {};
+    database.builtin["compare/3"] = Comparitor;
+    database.builtin["cut/0"] = Cut;
+    database.builtin["call/1"] = Call;
+    database.builtin["fail/0"] = Fail;
+    database.builtin["bagof/3"] = BagOf;
+    database.builtin["external/3"] = ExternalJS;
+    database.builtin["external2/3"] = ExternalAndParse;
     print("Attachments done.\n");
 
     print("Parsing rulesets.\n");
-    for (currentLineNumber = 0; currentLineNumber < rules.length; currentLineNumber++) {
-        currentRule = rules[currentLineNumber];
-        if (currentRule.substring(0, 1) == ops.comment || currentRule == "" || currentRule.match(/^\s*$/)) continue;
-        const or = Rule.parse(new Tokeniser(currentRule));
-        if (or == null) continue;
-        outr[outi++] = or;
-        // print ("Rule "+outi+" is : ");
-        if (show) or.print()
-        if (or.asking && or.body) {
-            const vs = varNames(or.body.list);
-            answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, outr, 1, applyOne(printVars, vs));
-        }
+    nextlines(document.rules.rules.value);
+}
+
+function nextlines(text: string, el?: HTMLTextAreaElement) {
+    if (el) el.value = '';
+    const lines = text.split("\n");
+    for (const line of lines)
+        nextline(line);
+}
+
+// called from HTML
+function nextline(line: string, el?: HTMLInputElement): Database {
+    if (!line) return database;
+    if (el) el.value = '';
+    console.warn(line);
+    if (line.substring(0, 1) == ops.comment || line == "" || line.match(/^\s*$/)) {
+        print(line);
+        return database;
     }
+    const or = Rule.parse(new Tokeniser(line));
+    if (or == null) {
+        // print('\n');
+        return database;
+    }
+    database.push(or);
+    if (document.input.showparse.checked) or.print()
+    if (or.asking && or.body) {
+        const vs = varNames(or.body.list);
+        answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, database, 1, applyOne(printVars, vs));
+    }
+    // print('\n');
+    if (el) el.scrollIntoView();
+
+    return database;
 }
 
 // Functional programming bits... Currying and suchlike
@@ -444,7 +470,7 @@ class Term {
 
             const part = Partlist.parse1(tk);
             if (part == null) {
-                console.error("part didn't parse at", tk.current, " in line: ", currentRule, "\nremainder:", tk.remainder);
+                console.error("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
                 return null;
             }
 

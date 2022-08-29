@@ -1,26 +1,38 @@
 <html>
   <head>
-    <title>prolog.js</title>
-    <script src="prolog.js"></script>
-  </head>
-  <body>
-    <h1>Prolog in Javascript</h1>
+    <title>Prolog in Javascript</title>
 
+    <style>
+      body {
+        background-color: #555555;
+        color: white;
+      }
+      textarea {
+        background-color: #555555;
+        color: white;
+      }
+      input[type="text"] {
+        background-color: #555555;
+        color: white;
+      }
+      #consoleout {
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body class="theme">
     <p>This prolog is enhanced with the JavaScript callout capability though a rudimentary external/3 call; see the arithmetic functions for examples.</p>
 
     <!--
       Having said that... I'm always interested to hear what people are up to with this, so if you feel keen or want a natter, drop me a line: logic@ioctl.org.
       I think that ideas are more important than kudos, but if you want to credit then I won't blush and I'm sure my employer at the time I wrote this, the
       University of Bristol, wouldn't mind you mentioning them.
+
+      Good luck!
     -->
 
-    <p>Good luck!</p>
-
-    <hr />
-
-    <form name="rules" action="javascript:return false;">
-      <p>
-        <textarea style="width: 100%; height: 100vh" name="rules">
+    <form name="rules" action="javascript:return false;" style="margin: 0; display: none">
+      <textarea style="width: 100%" name="rules">
 ### Accumulated standard library lives under here!
 
 # unification and [ x, y, z; w ] support
@@ -89,17 +101,19 @@
 ?- [bagof, c, [triple, sc, A, B], L], [length, L, N]           # L should have 21 elements
 
 </textarea
-        >
-      </p>
+      >
     </form>
     <form name="input" action="javascript:freeform();">
       <input type="submit" value="Run query" />
       <input type="checkbox" name="showparse" checked /> Show parse results
     </form>
-    <form name="output" action="javascript:return false;">
-      <p>
-        <textarea style="width: 100%; height: 100vh" name="output"></textarea>
-      </p>
-    </form>
+    <!-- <form name="output" action="javascript:return false;" style="margin: 0">
+      <textarea style="width: 100%" name="output" id="consoleout"></textarea>
+    </form> -->
+    <div id="consoleout">
+      <div></div>
+    </div>
+    <input type="text" id="commandline" onKeypress="[13,10].includes(event.keyCode) && nextline(event.target.value, this);" style="width: 100%" />
+    <script src="prolog.js"></script>
   </body>
 </html>
