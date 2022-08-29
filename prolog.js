@@ -3,6 +3,7 @@ function cls() {
     document.output.output.value = "";
 }
 function print(str) {
+    console.log(str);
     document.output.output.value += str;
 }
 function freeform() {
@@ -404,13 +405,15 @@ class Tokeniser {
             this.type = "eof";
             return this;
         }
-        r = this.remainder.match(/^([\(\)\.,\[\]\|\!]|\:\-)(.*)$/);
+        // punctuation   {  }  .  ,  [  ]  |  !  :-
+        r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\:\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
             this.type = "punc";
             return this;
         }
+        // variable
         r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*)(.*)$/);
         if (r) {
             this.remainder = r[2];
@@ -434,6 +437,7 @@ class Tokeniser {
             this.type = "id";
             return this;
         }
+        // symbol
         r = this.remainder.match(/^([a-zA-Z0-9][a-zA-Z0-9_]*)(.*)$/);
         if (r) {
             this.remainder = r[2];
@@ -441,6 +445,7 @@ class Tokeniser {
             this.type = "id";
             return this;
         }
+        // number
         r = this.remainder.match(/^(-[0-9][0-9]*)(.*)$/);
         if (r) {
             this.remainder = r[2];
@@ -448,6 +453,7 @@ class Tokeniser {
             this.type = "id";
             return this;
         }
+        // eof?
         this.current = null;
         this.type = "eof";
         return this;
@@ -489,21 +495,29 @@ function ParseTerm(tk) {
         notthis = true;
         tk = tk.consume();
     }
-    if (tk.type != "id")
+    if (tk.type != "punc" || tk.current != '[') {
+        console.error("expected [ to begin");
         return null;
+    }
+    tk = tk.consume();
+    if (tk.type != "id") {
+        console.error("expected first term to be a symbol / bare word");
+        return null;
+    }
     var name = tk.current;
     tk = tk.consume();
-    if (tk.current != "(") {
+    if (tk.current != ",") {
         // fail shorthand for fail(), ie, fail/0
         if (name == "fail") {
             return new Term(name, []);
         }
+        console.error("expected , after first term");
         return null;
     }
     tk = tk.consume();
     var p = [];
     var i = 0;
-    while (tk.current != ")") {
+    while (tk.current != "]") {
         if (tk.type == "eof")
             return null;
         var part = ParsePart(tk);
@@ -511,7 +525,7 @@ function ParseTerm(tk) {
             return null;
         if (tk.current == ",")
             tk = tk.consume();
-        else if (tk.current != ")")
+        else if (tk.current != "]")
             return null;
         // Add the current Part onto the list...
         p[i++] = part;
@@ -532,12 +546,12 @@ function ParsePart(tk) {
         return new Variable(n);
     }
     if (tk.type != "id") {
-        if (tk.type != "punc" || tk.current != "[")
+        if (tk.type != "punc" || tk.current != "{")
             return null;
         // Parse a list (syntactic sugar goes here)
         tk = tk.consume();
         // Special case: [] = new atom(nil).
-        if (tk.type == "punc" && tk.current == "]") {
+        if (tk.type == "punc" && tk.current == "}") {
             tk = tk.consume();
             return new Atom("nil");
         }
@@ -552,7 +566,7 @@ function ParsePart(tk) {
                 break;
             tk = tk.consume();
         }
-        // Find the end of the list ... "| Var ]" or "]".
+        // Find the end of the list ... "| Var }" or "}".
         var append;
         if (tk.current == "|") {
             tk = tk.consume();
@@ -564,7 +578,7 @@ function ParsePart(tk) {
         else {
             append = new Atom("nil");
         }
-        if (tk.current != "]")
+        if (tk.current != "}")
             return null;
         tk = tk.consume();
         // Return the new cons.... of all this rubbish.

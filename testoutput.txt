@@ -7,7 +7,6 @@ triple(sc, e, f).
 triple(sc, f, g).
 triple(type, sc, transitive).
 triple(P, X, Y) :- triple(type, P, transitive), triple(P, X, Z), triple(P, Z, Y).
-arcsOut(X, L) :- bagof(O, triple(P, X, O), L).
 unify(X, X).
 conjunction(nil).
 conjunction([X | Rest]) :- call(X), conjunction(Rest).
@@ -31,9 +30,7 @@ reverse(nil, nil).
 reverse([A | B], Z) :- reverse(B, Brev), append(Brev, [A], Z).
 length(nil, 0).
 length([H | T], N) :- length(T, M), add(M, 1, N).
-not(Term) :- call(Term), cut(), fail().
 not(Term).
-var(X) :- bagof(l, varTest(X), [l, l]).
 varTest(a).
 tarTest(b).
 
@@ -41,10 +38,4 @@ Attaching builtins to database.
 Attachments done.
 
 Parsing query.
-Query is: bagof(c, triple(sc, A, B), L), length(L, N)
-
-A = A.0
-B = B.0
-L = [c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c]
-N = 21
-
+An error occurred parsing the query.
