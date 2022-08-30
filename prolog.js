@@ -1,148 +1,121 @@
-const commandLineEl = document.getElementById('commandline');
-const consoleOutEl = document.getElementById('consoleout');
+const commandLineEl = document.getElementById("commandline");
+const consoleOutEl = document.getElementById("consoleout");
 function newConsoleLine() {
-    var elemDiv = document.createElement('div');
-    elemDiv.innerHTML = '&nbsp;';
+    var elemDiv = document.createElement("div");
+    elemDiv.innerHTML = "&nbsp;";
     consoleOutEl.appendChild(elemDiv);
     if (commandLineEl)
         commandLineEl.scrollIntoView();
     return elemDiv;
 }
-function print(str) {
-    console.log(str);
-    if (!str)
-        return;
-    const text = str.toString();
-    const lines = text.split('\n');
-    const multiline = lines.length > 1;
-    for (const line of lines) {
-        consoleOutEl.lastElementChild.append(line);
-        if (multiline)
-            newConsoleLine();
-    }
-}
 function printUserline(str) {
     const div = newConsoleLine();
-    div.classList.add('userdiv');
-    div.innerHTML = '<span>' + str + '</span>';
+    div.classList.add("userdiv");
+    div.innerHTML = "<span>" + str + "</span>";
     newConsoleLine();
 }
 function printEcholine(str) {
     if (!document.input.showparse.checked)
         return;
     const div = newConsoleLine();
-    div.classList.add('echodiv');
-    div.innerHTML = '<span>' + str + '</span>';
+    div.classList.add("echodiv");
+    div.innerHTML = "<span>" + str + "</span>";
     newConsoleLine();
 }
 function printAnswerline(str) {
     const div = newConsoleLine();
-    div.classList.add('answerdiv');
-    div.innerHTML = '<div><div>' + str.replaceAll('\n', '</div><div>') + '</div></div>';
+    div.classList.add("answerdiv");
+    div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
     newConsoleLine();
 }
 function consoleOutError(...rest) {
     const div = newConsoleLine();
-    div.classList.add('errdiv');
-    div.innerHTML = '<span class=err>' + rest.join(' ') + '</span>';
+    div.classList.add("errdiv");
+    div.innerHTML = "<span class=err>" + rest.join(" ") + "</span>";
     newConsoleLine();
     return null;
 }
 const database = [];
+let previousInput = "";
 function onCommandlineKey(event, el) {
-    if (event.key == 'Enter')
-        nextline(event.target.value, el);
-    else if (event.key == 'ArrowUp')
-        el.value = previousInput;
+    switch (event.key) {
+        case "ArrowUp":
+            el.value = previousInput;
+            return;
+        case "Enter":
+            nextline(event.target.value);
+            el.value = "";
+            el.scrollIntoView();
+            return;
+    }
 }
-// called from HTML
-function freeform() {
-    print("\nAttaching builtins to database.\n");
+// called from HTML on startup
+function bootstrap() {
+    printAnswerline("\nAttaching builtins to database.\n");
     database.builtin = {};
     database.builtin["compare/3"] = Comparitor;
-    database.builtin["commit" /* ops.cutCommit */ + "/0"] = Commit;
+    database.builtin["commit" /* cutCommit */ + "/0"] = Commit;
     database.builtin["call/1"] = Call;
     database.builtin["fail/0"] = Fail;
     database.builtin["bagof/3"] = BagOf;
     database.builtin["external/3"] = ExternalJS;
     database.builtin["external2/3"] = ExternalAndParse;
-    print("Attachments done.\n");
-    print("Parsing rulesets.\n");
+    printAnswerline("Attachments done.\n");
+    printAnswerline("Parsing rulesets.\n");
     nextlines(document.rules.rules.value);
 }
 function nextlines(text, el) {
     if (el)
-        el.value = '';
-    const lines = text.split("\n");
-    for (const line of lines)
-        nextline(line);
+        el.value = "";
+    text.split("\n").forEach(nextline);
 }
-let previousInput = '';
-// called from HTML
-function nextline(line, el) {
+function nextline(line) {
     printUserline(line);
     if (!line)
         return database;
-    if (el)
-        el.value = '';
     previousInput = line;
-    if (line.substring(0, 1) == "#" /* ops.comment */ || line == "" || line.match(/^\s*$/)) {
+    if (line.substring(0, 1) == "#" /* comment */ || line == "" || line.match(/^\s*$/))
         return database;
-    }
-    const or = Rule.parse(new Tokeniser(line));
-    if (or == null)
+    const rule = Rule.parse(new Tokeniser(line));
+    if (rule == null)
         return database;
-    database.push(or);
-    printEcholine(or.print());
-    if (or.asking && or.body) {
-        const vs = varNames(or.body.list);
-        answerQuestion(renameVariables(or.body.list, 0, []), {}, database, 1, applyOne(printVars, vs));
+    database.push(rule);
+    printEcholine(rule.print());
+    if (rule.asking && rule.body) {
+        const vs = varNames(rule.body.list);
+        answerQuestion(renameVariables(rule.body.list, 0, []), {}, database, 1, applyOne(printVars, vs));
     }
-    if (el)
-        el.scrollIntoView();
     return database;
 }
 // Functional programming bits... Currying and suchlike
 function applyOne(f, arg1) {
-    return function (arg2) { return f(arg1, arg2); };
+    return function (arg2) {
+        return f(arg1, arg2);
+    };
 }
 // Some auxiliary bits and pieces... environment-related.
 // Print out an environment's contents.
 function printEnv(env) {
-    if (env == null) {
-        printAnswerline("Nothing.\n");
-        return;
-    }
-    let retval = [];
-    let k = false;
-    for (const i in env) {
-        k = true;
-        retval.push(" " + i + " = ");
-        retval.push(env[i].print());
+    if (!env)
+        return printAnswerline("nothing" /* nothing */ + ".\n");
+    const retval = Object.entries(env).map(([name, part]) => ` ${name} = ${part.print()}\n`);
+    printAnswerline(retval.length ? retval.join("") : "Yes.\n");
+}
+// Print bindings.
+function printVars(variables, environment) {
+    if (variables.length == 0)
+        return printAnswerline("Yes.\n\n");
+    const retval = [];
+    for (const variable of variables) {
+        if (variable.name != "?" /* impliedQuestionVar */) {
+            retval.push(variable.name);
+            retval.push(" is ");
+        }
+        retval.push(value(new Variable(variable.name + ".0"), environment).print());
         retval.push("\n");
     }
-    if (!k)
-        retval.push("Yes.\n");
-    printAnswerline(retval.join(''));
-}
-function printVars(which, environment) {
-    // Print bindings.
-    let retval = [];
-    if (which.length == 0) {
-        retval.push("Yes.\n");
-    }
-    else {
-        for (var i = 0; i < which.length; i++) {
-            if (which[i].name != "?" /* ops.impliedQuestionVar */) {
-                retval.push(which[i].name);
-                retval.push(" is ");
-            }
-            retval.push((value(new Variable(which[i].name + ".0"), environment)).print());
-            retval.push("\n");
-        }
-    }
     retval.push("\n");
-    printAnswerline(retval.join(''));
+    printAnswerline(retval.join(""));
 }
 // The value of x in a given environment
 function value(x, env) {
@@ -202,7 +175,7 @@ function unify(x, y, env) {
 // Go through a list of terms (ie, a Body or Partlist's list) renaming variables
 // by appending 'level' to each variable name.
 // How non-graph-theoretical can this get?!?
-// "parent" points to the subgoal, the expansion of which lead to these terms.
+// "parent" points to the subgoal, the expansion of variables lead to these terms.
 function renameVariables(list, level, parent) {
     if (!Array.isArray(list)) {
         if (list.type == "Atom") {
@@ -223,14 +196,14 @@ function renameVariables(list, level, parent) {
         for (var i = 0; i < list.length; i++) {
             out[i] = renameVariables(list[i], level, parent);
             /*
-                    if (list[i].type == "Atom") {
-                        out[i] = list[i];
-                    } else if (list[i].type == "Variable") {
-                        out[i] = new Variable(list[i].name + "." + level);
-                    } else if (list[i].type == "Term") {
-                        (out[i] = new Term(list[i].name, renameVariables(list[i].partlist.list, level, parent))).parent = parent;
-                    }
-            */
+                          if (list[i].type == "Atom") {
+                              out[i] = list[i];
+                          } else if (list[i].type == "Variable") {
+                              out[i] = new Variable(list[i].name + "." + level);
+                          } else if (list[i].type == "Term") {
+                              (out[i] = new Term(list[i].name, renameVariables(list[i].partlist.list, level, parent))).parent = parent;
+                          }
+                  */
         }
         return out;
     }
@@ -345,14 +318,18 @@ function answerQuestion(goalList, environment, db, level, reportFunction) {
 class Variable {
     constructor(head) {
         this.name = head;
-        this.print = function () { return (this.name); };
+        this.print = function () {
+            return this.name;
+        };
         this.type = "Variable";
     }
 }
 class Atom {
     constructor(head) {
         this.name = head;
-        this.print = function () { return (this.name); };
+        this.print = function () {
+            return this.name;
+        };
         this.type = "Atom";
     }
 }
@@ -370,9 +347,9 @@ class Term {
             while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
                 part = part.partlist.list[1];
             }
-            if ((part.type == "Atom" && part.name == "nothing") || part.type == "Variable") {
+            if ((part.type == "Atom" && part.name == "nothing" /* nothing */) || part.type == "Variable") {
                 part = this;
-                retval.push("{" /* ops.openList */);
+                retval.push("{" /* openList */);
                 let com = false;
                 while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
                     if (com)
@@ -382,32 +359,31 @@ class Term {
                     part = part.partlist.list[1];
                 }
                 if (part.type == "Variable") {
-                    retval.push(" " + "|" /* ops.sliceList */ + " ");
+                    retval.push(" " + "|" /* sliceList */ + " ");
                     retval.push(part.print());
                 }
-                retval.push("}" /* ops.closeList */);
-                return retval.join('');
+                retval.push("}" /* closeList */);
+                return retval.join("");
             }
         }
-        retval.push("[" /* ops.open */ + this.name);
+        retval.push("[" /* open */ + this.name);
         retval.push(this.partlist.print());
-        retval.push("]" /* ops.close */);
-        return retval.join('');
+        retval.push("]" /* close */);
+        return retval.join("");
     }
-    ;
     static parse(tk) {
         // Term -> [NOTTHIS] id ( optParamList )
-        if ( /*tk.type == "id" && */tk.current == "commit" /* ops.cutCommit */) {
+        if ( /*tk.type == "id" && */tk.current == "commit" /* cutCommit */) {
             // Parse bareword commit as commit/0
             tk = tk.consume();
-            return new Term("commit" /* ops.cutCommit */, []);
+            return new Term("commit" /* cutCommit */, []);
         }
         let notthis = false;
         if (tk.current == "NOTTHIS") {
             notthis = true;
             tk = tk.consume();
         }
-        if (tk.type != "punc" || tk.current != "[" /* ops.open */)
+        if (tk.type != "punc" || tk.current != "[" /* open */)
             return consoleOutError("expected [ to begin");
         tk = tk.consume();
         if (tk.type != "id")
@@ -421,7 +397,7 @@ class Term {
         const parts = [];
         while (tk.current != "]") {
             if (tk.type == "eof")
-                return consoleOutError('unexpected EOF while running through terms until', "]" /* ops.close */);
+                return consoleOutError("unexpected EOF while running through terms until", "]" /* close */);
             const part = Partlist.parse1(tk);
             if (part == null)
                 return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
@@ -448,9 +424,8 @@ class Partlist {
             retval.push(", ");
             retval.push(this.list[i].print());
         }
-        return retval.join('');
+        return retval.join("");
     }
-    ;
     // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
     static parse1(tk) {
         // Part -> var | id | id(optParamList)
@@ -460,13 +435,13 @@ class Partlist {
             tk = tk.consume();
             return new Variable(varName);
         }
-        if (tk.type == "punc" && tk.current == "{" /* ops.openList */) {
+        if (tk.type == "punc" && tk.current == "{" /* openList */) {
             tk = tk.consume();
             // destructure a list
             // Special case: {} = new atom(nothing).
-            if (tk.type == "punc" && tk.current == "}" /* ops.closeList */) {
+            if (tk.type == "punc" && tk.current == "}" /* closeList */) {
                 tk = tk.consume();
-                return new Atom("nothing");
+                return new Atom("nothing" /* nothing */);
             }
             // Get a list of parts into l
             const parts = [];
@@ -482,17 +457,17 @@ class Partlist {
             }
             // Find the end of the list ... "| Var }" or "}".
             let append;
-            if (tk.current == "|" /* ops.sliceList */) {
+            if (tk.current == "|" /* sliceList */) {
                 tk = tk.consume();
                 if (tk.type != "var")
-                    return consoleOutError("|" /* ops.sliceList */, " wasn't followed by a var");
+                    return consoleOutError("|" /* sliceList */, " wasn't followed by a var");
                 append = new Variable(tk.current);
                 tk = tk.consume();
             }
             else {
-                append = new Atom("nothing");
+                append = new Atom("nothing" /* nothing */);
             }
-            if (tk.current != "}" /* ops.closeList */)
+            if (tk.current != "}" /* closeList */)
                 return consoleOutError("list destructure wasn't ended by }");
             tk = tk.consume();
             // Return the new cons.... of all this rubbish.
@@ -500,19 +475,19 @@ class Partlist {
                 append = new Term("cons", [parts[i], append]);
             return append;
         }
-        const openbracket = (tk.type == 'punc' && tk.current == "[" /* ops.open */);
+        const openbracket = tk.type == "punc" && tk.current == "[" /* open */;
         if (openbracket)
             tk = tk.consume();
         const name = tk.current;
         tk = tk.consume();
         if (!openbracket)
             return new Atom(name);
-        if (tk.current != ',')
+        if (tk.current != ",")
             return consoleOutError("expected , after symbol");
         tk = tk.consume();
         const parts = [];
         let i = 0;
-        while (tk.current != "]" /* ops.close */) {
+        while (tk.current != "]" /* close */) {
             if (tk.type == "eof")
                 return null;
             const part = Partlist.parse1(tk);
@@ -520,7 +495,7 @@ class Partlist {
                 return null;
             if (tk.current == ",")
                 tk = tk.consume();
-            else if (tk.current != "]" /* ops.close */)
+            else if (tk.current != "]" /* close */)
                 return null;
             // Add the current Part onto the list...
             parts[i++] = part;
@@ -540,7 +515,7 @@ class Body {
             if (i < this.list.length - 1)
                 retval.push(", ");
         }
-        return retval.join(' ');
+        return retval.join(" ");
     }
 }
 class Rule {
@@ -552,7 +527,7 @@ class Rule {
         }
         else {
             this.head = head;
-            this.body = (bodylist != null) ? new Body(bodylist) : null;
+            this.body = bodylist != null ? new Body(bodylist) : null;
             this.asking = isQuestion;
         }
     }
@@ -561,30 +536,30 @@ class Rule {
         if (this.head != null)
             retval.push(this.head.print());
         if (this.head && this.body)
-            retval.push((" " + "if" /* ops.if */ + " "));
+            retval.push(" " + "if" /* if */ + " ");
         if (this.body != null)
             retval.push(this.body.print());
-        retval.push(((this.asking ? "?" /* ops.endQuestion */ : "." /* ops.endSentence */) + "\n"));
-        return retval.join(' ');
+        retval.push((this.asking ? "?" /* endQuestion */ : "." /* endSentence */) + "\n");
+        return retval.join(" ");
     }
     static parse(tk) {
         // A rule is a Head followed by . or by :- Body
         const head = Rule.parseHead(tk);
         if (!head)
             return consoleOutError("syntax error");
-        if (tk.current == "." /* ops.endSentence */)
+        if (tk.current == "." /* endSentence */)
             return new Rule(head);
         const questionIsImplied = hasTheImpliedQuestionVar(head);
-        const endQuestionNow = tk.current == "?" /* ops.endQuestion */;
-        const isQuestion = tk.current == "?" /* ops.endQuestion */ || tk.current == "," /* ops.bodyTermSeparator */ || questionIsImplied;
-        if (tk.current != "if" /* ops.if */ && !isQuestion)
-            return consoleOutError("expected one of", ["if" /* ops.if */, "?" /* ops.endQuestion */, "." /* ops.endSentence */, "," /* ops.bodyTermSeparator */].join(' '), " but found", tk.remainder);
-        if (tk.type == 'eof')
+        const endQuestionNow = tk.current == "?" /* endQuestion */;
+        const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
+        if (tk.current != "if" /* if */ && !isQuestion)
+            return consoleOutError("expected one of", ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */].join(" "), " but found", tk.remainder);
+        if (tk.type == "eof")
             return new Rule(head, null, isQuestion);
         tk = tk.consume();
         const body = endQuestionNow ? null : Rule.parseBody(tk);
-        if (!endQuestionNow && tk.current != "." /* ops.endSentence */ && tk.current != "?" /* ops.endQuestion */ && !questionIsImplied)
-            return consoleOutError("expected one of", "." /* ops.endSentence */, "?" /* ops.endQuestion */, " but remaining:", tk.remainder);
+        if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
+            return consoleOutError("expected one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
         return new Rule(head, body, isQuestion);
     }
     static parseHead(tk) {
@@ -609,9 +584,12 @@ class Rule {
 }
 function hasTheImpliedQuestionVar(term) {
     switch (term.type) {
-        case 'Atom': return false;
-        case 'Variable': return term.name === "?" /* ops.impliedQuestionVar */;
-        case 'Term': return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
+        case "Atom":
+            return false;
+        case "Variable":
+            return term.name === "?" /* impliedQuestionVar */;
+        case "Term":
+            return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
     }
 }
 // The Tiny-Prolog parser goes here.
@@ -690,7 +668,6 @@ class Tokeniser {
         this.type = "eof";
         return this;
     }
-    ;
 }
 // A sample builtin function, including all the bits you need to get it to work
 // within the general proving mechanism.
@@ -786,15 +763,15 @@ function BagOf(thisTerm, goalList, environment, db, level, reportFunction) {
     const ret = answerQuestion(newGoals, environment, db, level + 1, BagOfCollectFunction(collect, anslist));
     // Turn anslist into a proper list and unify with 'into'
     // optional here: nothing anslist -> fail?
-    let answers = new Atom("nothing");
+    let answers = new Atom("nothing" /* nothing */);
     /*
-    print("Debug: anslist = [");
-        for (var j = 0; j < anslist.length; j++) {
-            anslist[j].print();
-            print(", ");
-        }
-    print("]\n");
-    */
+      print("Debug: anslist = [");
+          for (var j = 0; j < anslist.length; j++) {
+              anslist[j].print();
+              print(", ");
+          }
+      print("]\n");
+      */
     for (var i = anslist.length; i > 0; i--)
         answers = new Term("cons", [anslist[i - 1], answers]);
     //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
@@ -810,21 +787,21 @@ function BagOf(thisTerm, goalList, environment, db, level, reportFunction) {
 function BagOfCollectFunction(collect, anslist) {
     return function (env) {
         /*
-        print("DEBUG: solution in bagof/3 found...\n");
-        print("Value of collection term ");
-        collect.print();
-        print(" in this environment = ");
-        (value(collect, env)).print();
-        print("\n");
-        printEnv(env);
-        */
+            print("DEBUG: solution in bagof/3 found...\n");
+            print("Value of collection term ");
+            collect.print();
+            print(" in this environment = ");
+            (value(collect, env)).print();
+            print("\n");
+            printEnv(env);
+            */
         // Rename this appropriately and throw it into anslist
         anslist[anslist.length] = renameVariables(value(collect, env), anslist.renumber--, []);
     };
 }
 // Call out to external javascript
 // external/3 takes three arguments:
-// first: a template string that uses $1, $2, etc. as placeholders for 
+// first: a template string that uses $1, $2, etc. as placeholders for
 const EvalContext = [];
 function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) {
     //print ("DEBUG: in External...\n");
@@ -856,7 +833,7 @@ function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) 
         second = second.partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nothing") {
+    if (second.type != "Atom" || second.name != "nothing" /* nothing */) {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -867,7 +844,7 @@ function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) 
         ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
-        ret = "nothing";
+        ret = "nothing" /* nothing */;
     // Convert back into an atom...
     const env2 = unify(thisTerm.partlist.list[2], new Atom(ret), environment);
     if (env2 == null) {
@@ -907,7 +884,7 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
         second = second.partlist.list[1];
         i++;
     }
-    if (second.type != "Atom" || second.name != "nothing") {
+    if (second.type != "Atom" || second.name != "nothing" /* nothing */) {
         //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
         return null;
     }
@@ -918,7 +895,7 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
         ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
-        ret = "nothing";
+        ret = "nothing" /* nothing */;
     // Convert back into a Prolog term by calling the appropriate Parse routine...
     const part = Partlist.parse1(new Tokeniser(ret));
     //print("DEBUG: external2, ret = "); ret.print(); print(".\n");
@@ -930,5 +907,5 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
     // Just prove the rest of the goallist, recursively.
     return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
-freeform();
+bootstrap();
 commandLineEl.focus();
