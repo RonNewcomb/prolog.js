@@ -371,11 +371,9 @@ class Term {
             tk = tk.consume();
             return new Term("commit" /* cutCommit */, []);
         }
-        let notthis = false;
-        if (tk.current == "NOTTHIS" /* notThis */) {
-            notthis = true;
+        let notthis = tk.current == "NOTTHIS" /* notThis */;
+        if (notthis)
             tk = tk.consume();
-        }
         if (tk.type != "punc" || tk.current != "[" /* open */)
             return consoleOutError("expected [ to begin");
         tk = tk.consume();
@@ -400,12 +398,7 @@ class Partlist {
         this.list = list;
     }
     print() {
-        const retval = [];
-        for (let i = 0; i < this.list.length; i++) {
-            retval.push(", ");
-            retval.push(this.list[i].print());
-        }
-        return retval.join("");
+        return this.list.map((each) => ", " + each.print()).join("");
     }
     static parse(tk) {
         const parts = [];
@@ -433,22 +426,21 @@ class Partlist {
             tk = tk.consume();
             return new Variable(varName);
         }
+        // destructure a list
         if (tk.type == "punc" && tk.current == "{" /* openList */) {
             tk = tk.consume();
-            // destructure a list
             // Special case: {} = new atom(nothing).
             if (tk.type == "punc" && tk.current == "}" /* closeList */) {
                 tk = tk.consume();
                 return new Atom("nothing" /* nothing */);
             }
-            // Get a list of parts into l
+            // Get a list of parts
             const parts = [];
-            let i = 0;
             while (true) {
                 const part = Partlist.parse1(tk);
                 if (part == null)
                     return consoleOutError("subpart didn't parse:", tk.current);
-                parts[i++] = part;
+                parts.push(part);
                 if (tk.current != ",")
                     break;
                 tk = tk.consume();
@@ -469,7 +461,7 @@ class Partlist {
                 return consoleOutError("list destructure wasn't ended by }");
             tk = tk.consume();
             // Return the new cons.... of all this rubbish.
-            for (--i; i >= 0; i--)
+            for (let i = parts.length - 1; i >= 0; i--)
                 append = new Term("cons" /* cons */, [parts[i], append]);
             return append;
         }
@@ -494,13 +486,7 @@ class Body {
         this.list = list;
     }
     print() {
-        const retval = [];
-        for (var i = 0; i < this.list.length; i++) {
-            retval.push(this.list[i].print());
-            if (i < this.list.length - 1)
-                retval.push(", ");
-        }
-        return retval.join(" ");
+        return this.list.map((each) => each.print()).join(", ");
     }
 }
 class Rule {
@@ -579,10 +565,10 @@ function hasTheImpliedQuestionVar(term) {
 }
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
-    constructor(string) {
-        this.remainder = string;
-        this.current = null;
-        this.type = null; // "eof", "id", "var", "punc" etc.
+    constructor(line) {
+        this.remainder = line;
+        this.current = "";
+        this.type = ""; // "eof", "id", "var", "punc" etc.
         this.consume(); // Load up the first token.
     }
     consume() {
@@ -596,7 +582,7 @@ class Tokeniser {
             this.remainder = r[1];
         }
         if (this.remainder == "") {
-            this.current = null;
+            this.current = "";
             this.type = "eof";
             return this;
         }
@@ -649,7 +635,7 @@ class Tokeniser {
             return this;
         }
         // eof?
-        this.current = null;
+        this.current = "";
         this.type = "eof";
         return this;
     }

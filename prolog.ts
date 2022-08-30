@@ -576,12 +576,7 @@ class Body {
   }
 
   print(): string {
-    const retval: string[] = [];
-    for (var i = 0; i < this.list.length; i++) {
-      retval.push(this.list[i].print());
-      if (i < this.list.length - 1) retval.push(", ");
-    }
-    return retval.join(" ");
+    return this.list.map((each) => each.print()).join(", ");
   }
 }
 
