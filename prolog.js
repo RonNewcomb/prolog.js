@@ -35,6 +35,12 @@ function consoleOutError(...rest) {
     return null;
 }
 const database = [];
+function onCommandlineKey(event, el) {
+    if (event.key == 'Enter')
+        nextline(event.target.value, el);
+    else if (event.key == 'ArrowUp')
+        el.value = previousInput;
+}
 // called from HTML
 function freeform() {
     print("\nAttaching builtins to database.\n");
@@ -57,6 +63,7 @@ function nextlines(text, el) {
     for (const line of lines)
         nextline(line);
 }
+let previousInput = '';
 // called from HTML
 function nextline(line, el) {
     printUserline(line);
@@ -64,6 +71,7 @@ function nextline(line, el) {
         return database;
     if (el)
         el.value = '';
+    previousInput = line;
     if (line.substring(0, 1) == "#" /* comment */ || line == "" || line.match(/^\s*$/)) {
         return database;
     }
@@ -534,28 +542,23 @@ class Rule {
     }
     static parse(tk) {
         // A rule is a Head followed by . or by :- Body
-        const h = Rule.parseHead(tk);
-        if (!h)
-            return null;
-        if (tk.current == "." /* endSentence */) {
-            // A simple rule.
-            return new Rule(h);
-        }
+        const head = Rule.parseHead(tk);
+        if (!head)
+            return consoleOutError("syntax error");
+        if (tk.current == "." /* endSentence */)
+            return new Rule(head);
         const endQuestionNow = tk.current == "?" /* endQuestion */;
-        const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */;
+        const questionIsImplied = hasTheImpliedQuestionVar(head);
+        const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
         if (tk.current != "if" /* if */ && !isQuestion)
             return consoleOutError("expected one of", ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */].join(' '), " but found", tk.remainder);
         tk = tk.consume();
-        const b = endQuestionNow ? null : Rule.parseBody(tk);
-        if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */)
+        const body = endQuestionNow ? null : Rule.parseBody(tk);
+        if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
             return consoleOutError("expected one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
-        return new Rule(h, b, isQuestion);
+        return new Rule(head, body, isQuestion);
     }
     static parseHead(tk) {
-        // is query? so, no head.
-        if (tk.type == 'punc' && tk.current == "?-" /* query */) {
-            return new Term("?-" /* query */, []);
-        }
         // A head is simply a term. (errors cascade back up)
         return Term.parse(tk);
     }
@@ -573,6 +576,13 @@ class Rule {
         if (i == 0)
             return null;
         return terms;
+    }
+}
+function hasTheImpliedQuestionVar(term) {
+    switch (term.type) {
+        case 'Atom': return false;
+        case 'Variable': return term.name === "?" /* impliedQuestionVar */;
+        case 'Term': return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
     }
 }
 // The Tiny-Prolog parser goes here.

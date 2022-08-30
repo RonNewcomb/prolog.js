@@ -119,7 +119,7 @@
     <div id="consoleout">
       <div></div>
     </div>
-    <input type="text" id="commandline" onKeypress="[13,10].includes(event.keyCode) && nextline(event.target.value, this);" style="width: 100%" />
+    <input type="text" id="commandline" onkeydown="onCommandlineKey(event, this);" style="width: 100%" />
     <script src="prolog.js"></script>
   </body>
 </html>

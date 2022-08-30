@@ -16,8 +16,9 @@ const enum ops {
     sliceList = '|',
     endSentence = '.',
     endQuestion = '?',
+    impliedQuestionVar = '?',
     if = 'if',
-    query = '?-',
+    //query = '?-',
     comment = '#',
     bodyTermSeparator = ',',
     paramSeparator = ',',
@@ -70,6 +71,10 @@ interface Functor {
 type Database = Rule[] & { builtin?: { [key: string]: Functor } };
 const database = [] as Database;
 
+function onCommandlineKey(event: any, el: HTMLInputElement) {
+    if (event.key == 'Enter') nextline(event.target.value, el);
+    else if (event.key == 'ArrowUp') el.value = previousInput;
+}
 
 // called from HTML
 function freeform() {
@@ -95,11 +100,14 @@ function nextlines(text: string, el?: HTMLTextAreaElement) {
         nextline(line);
 }
 
+let previousInput = '';
+
 // called from HTML
 function nextline(line: string, el?: HTMLInputElement): Database {
     printUserline(line);
     if (!line) return database;
     if (el) el.value = '';
+    previousInput = line;
     if (line.substring(0, 1) == ops.comment || line == "" || line.match(/^\s*$/)) {
         return database;
     }
@@ -628,34 +636,26 @@ class Rule {
     static parse(tk: Tokeniser): Rule | null {
         // A rule is a Head followed by . or by :- Body
 
-        const h = Rule.parseHead(tk);
-        if (!h) return null;
+        const head = Rule.parseHead(tk);
+        if (!head) return consoleOutError("syntax error");
 
-        if (tk.current == ops.endSentence) {
-            // A simple rule.
-            return new Rule(h);
-        }
+        if (tk.current == ops.endSentence) return new Rule(head);
 
         const endQuestionNow = tk.current == ops.endQuestion;
-        const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator;
+        const questionIsImplied = hasTheImpliedQuestionVar(head);
+        const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator || questionIsImplied;
         if (tk.current != ops.if && !isQuestion) return consoleOutError("expected one of", [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator].join(' '), " but found", tk.remainder);
 
         tk = tk.consume();
-        const b = endQuestionNow ? null : Rule.parseBody(tk);
+        const body = endQuestionNow ? null : Rule.parseBody(tk);
 
-        if (!endQuestionNow && tk.current != ops.endSentence && tk.current != ops.endQuestion)
+        if (!endQuestionNow && tk.current != ops.endSentence && tk.current != ops.endQuestion && !questionIsImplied)
             return consoleOutError("expected one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
 
-        return new Rule(h, b, isQuestion);
+        return new Rule(head, body, isQuestion);
     }
 
     static parseHead(tk: Tokeniser): Term | null {
-
-        // is query? so, no head.
-        if (tk.type == 'punc' && tk.current == ops.query) {
-            return new Term(ops.query, []);
-        }
-
         // A head is simply a term. (errors cascade back up)
         return Term.parse(tk);
     }
@@ -678,6 +678,13 @@ class Rule {
 
 }
 
+function hasTheImpliedQuestionVar(term: Part): boolean {
+    switch (term.type) {
+        case 'Atom': return false;
+        case 'Variable': return term.name === ops.impliedQuestionVar;
+        case 'Term': return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
+    }
+}
 
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
