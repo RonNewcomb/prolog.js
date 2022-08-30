@@ -641,17 +641,16 @@ class Rule {
   static parseBody(tk: Tokeniser): Term[] | null {
     // Body -> Term {, Term...}
     const terms: Term[] = [];
-    let i = 0;
 
-    let term: Term | null;
-    while ((term = Term.parse(tk)) != null) {
-      terms[i++] = term;
+    while (true) {
+      const term = Term.parse(tk);
+      if (term == null) break;
+      terms.push(term);
       if (tk.current != ",") break;
       tk = tk.consume();
     }
 
-    if (i == 0) return null;
-    return terms;
+    return terms.length == 0 ? null : terms;
   }
 }
 

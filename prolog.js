@@ -504,13 +504,14 @@ class Rule {
     }
     print() {
         const retval = [];
-        if (this.head != null)
+        if (this.head)
             retval.push(this.head.print());
         if (this.head && this.body)
-            retval.push(" " + "if" /* if */ + " ");
-        if (this.body != null)
+            retval.push("if" /* if */);
+        if (this.body)
             retval.push(this.body.print());
-        retval.push((this.asking ? "?" /* endQuestion */ : "." /* endSentence */) + "\n");
+        retval.push(this.asking ? "?" /* endQuestion */ : "." /* endSentence */);
+        retval.push("\n");
         return retval.join(" ");
     }
     static parse(tk) {
@@ -520,17 +521,18 @@ class Rule {
             return consoleOutError("syntax error");
         if (tk.current == "." /* endSentence */)
             return new Rule(head);
+        const expected = ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */];
         const questionIsImplied = hasTheImpliedQuestionVar(head);
+        if (!expected.includes(tk.current) && !questionIsImplied && tk.type != "eof")
+            return consoleOutError("expected one of", expected.join(" "), " but found", tk.remainder);
         const endQuestionNow = tk.current == "?" /* endQuestion */;
         const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
-        if (tk.current != "if" /* if */ && !isQuestion)
-            return consoleOutError("expected one of", ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */].join(" "), " but found", tk.remainder);
         if (tk.type == "eof")
             return new Rule(head, null, isQuestion);
         tk = tk.consume();
         const body = endQuestionNow ? null : Rule.parseBody(tk);
         if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
-            return consoleOutError("expected one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
+            return consoleOutError("expected end of sentence with one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
         return new Rule(head, body, isQuestion);
     }
     static parseHead(tk) {
