@@ -88,7 +88,7 @@ function nextline(line) {
     }
     return database;
 }
-// Some auxiliary bits and pieces... environment-related.
+// environment ///////
 // Print out an environment's contents.
 function printEnv(env) {
     if (!env)
@@ -165,58 +165,41 @@ function unify(x, y, env) {
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these terms.
 function renameVariables(list, level, parent) {
-    if (!Array.isArray(list)) {
-        if (list.type == "Atom") {
-            return list;
-        }
-        else if (list.type == "Variable") {
-            return new Variable(list.name + "." + level);
-        }
-        else if (list.type == "Term") {
-            const out = new Term(list.name, renameVariables(list.partlist.list, level, parent));
-            out.parent = parent;
-            return out;
-        }
-        return [];
-    }
-    else {
-        const out = [];
-        for (var i = 0; i < list.length; i++) {
-            out[i] = renameVariables(list[i], level, parent);
-            /*
-                          if (list[i].type == "Atom") {
-                              out[i] = list[i];
-                          } else if (list[i].type == "Variable") {
-                              out[i] = new Variable(list[i].name + "." + level);
-                          } else if (list[i].type == "Term") {
-                              (out[i] = new Term(list[i].name, renameVariables(list[i].partlist.list, level, parent))).parent = parent;
-                          }
-                  */
-        }
-        return out;
+    return list.map((part) => renameVariable(part, level, parent));
+}
+function renameVariable(part, level, parent) {
+    switch (part.type) {
+        case "Atom":
+            return part;
+        case "Variable":
+            return new Variable(part.name + "." + level);
+        case "Term":
+            const term = new Term(part.name, renameVariables(part.partlist.list, level, parent));
+            term.parent = parent;
+            return term;
     }
 }
 // Return a list of all variables mentioned in a list of Terms.
-function varNames(list) {
-    const out = [];
-    main: for (var i = 0; i < list.length; i++) {
-        if (list[i].type == "Variable") {
-            for (var j = 0; j < out.length; j++)
-                if (out[j].name == list[i].name)
-                    continue main;
-            out[out.length] = list[i];
+function varNames(parts) {
+    const variables = [];
+    for (const part of parts) {
+        switch (part.type) {
+            case "Atom":
+                continue;
+            case "Variable":
+                if (!variables.find((o) => o.name == part.name))
+                    variables.push(part);
+                continue;
+            case "Term":
+                const nestedVariables = varNames(part.partlist.list);
+                for (const nestedVariable of nestedVariables) {
+                    if (!variables.find((o) => o.name == nestedVariable.name))
+                        variables.push(nestedVariable);
+                }
+                continue;
         }
-        else if (list[i].type == "Term") {
-            const o2 = varNames(list[i].partlist.list);
-            inner: for (var j = 0; j < o2.length; j++) {
-                for (var k = 0; k < out.length; k++)
-                    if (o2[j].name == out[k].name)
-                        continue inner;
-                out[out.length] = o2[j];
-            }
-        } // else Atom but nothing to do...
     }
-    return out;
+    return variables;
 }
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)

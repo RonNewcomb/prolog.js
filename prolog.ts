@@ -216,34 +216,18 @@ function unify(x: Part, y: Part, env: Environment): Environment | null {
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these terms.
 function renameVariables(list: Part[] | Part, level: number, parent: Term[] | Term): Part[] | Part {
-  if (!Array.isArray(list)) {
-    if (list.type == "Atom") {
-      return list;
-    } else if (list.type == "Variable") {
-      return new Variable(list.name + "." + level);
-    } else if (list.type == "Term") {
-      const out = new Term(list.name, renameVariables((list as Term).partlist.list, level, parent) as Part[]);
-      out.parent = parent as Term;
-      return out;
-    }
-    return [];
-  } else {
-    const out: Part[] = [];
-
-    for (var i = 0; i < list.length; i++) {
-      out[i] = renameVariables(list[i], level, parent) as Part;
-      /*
-                    if (list[i].type == "Atom") {
-                        out[i] = list[i];
-                    } else if (list[i].type == "Variable") {
-                        out[i] = new Variable(list[i].name + "." + level);
-                    } else if (list[i].type == "Term") {
-                        (out[i] = new Term(list[i].name, renameVariables(list[i].partlist.list, level, parent))).parent = parent;
-                    }
-            */
-    }
-
-    return out;
+  return Array.isArray(list) ? list.map((part) => renameVariable(part, level, parent) as Part) : renameVariable(list, level, parent);
+}
+function renameVariable(part: Part, level: number, parent: Term[] | Term): Part {
+  switch (part.type) {
+    case "Atom":
+      return part;
+    case "Variable":
+      return new Variable(part.name + "." + level);
+    case "Term":
+      const term = new Term(part.name, renameVariables(part.partlist.list, level, parent) as Part[]);
+      term.parent = parent as Term;
+      return term;
   }
 }
 
