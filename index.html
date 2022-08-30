@@ -84,7 +84,7 @@
 [length, {H|T}, N] if [length, T, M], [add, M, 1, N].
 
 # Standard prolog not/1
-[not, Term] if [call, Term], !, [fail].
+[not, Term] if [call, Term], commit, [fail].
 [not, Term].
 
 # Standard prolog var/1

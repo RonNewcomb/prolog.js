@@ -21,6 +21,7 @@ const enum ops {
     comment = '#',
     bodyTermSeparator = ',',
     paramSeparator = ',',
+    cutCommit = 'commit',
 }
 
 const commandLineEl: HTMLInputElement = document.getElementById('commandline')! as HTMLInputElement;
@@ -48,7 +49,7 @@ function print(str: string | number) {
 
 function printUserline(str: string) {
     const div = newConsoleLine();
-    //div.classList.add('errdiv');
+    //div.classList.add('userdiv');
     div.innerHTML = '<span>' + str + '</span>';
     newConsoleLine();
 }
@@ -75,7 +76,7 @@ function freeform() {
     print("\nAttaching builtins to database.\n");
     database.builtin = {};
     database.builtin["compare/3"] = Comparitor;
-    database.builtin["cut/0"] = Cut;
+    database.builtin[ops.cutCommit + "/0"] = Commit;
     database.builtin["call/1"] = Call;
     database.builtin["fail/0"] = Fail;
     database.builtin["bagof/3"] = BagOf;
@@ -262,16 +263,12 @@ function varNames(list: Part[]): (Variable | Term)[] {
                     if (o2[j].name == out[k].name) continue inner;
                 out[out.length] = o2[j];
             }
-        }
+        } // else Atom but nothing to do...
     }
     return out;
 }
 
 // The meat of this thing... js-tinyProlog.
-// Don't expect built-ins at present. To come:
-//	unification of term heads, cut, fail, call, bagof
-//	(in that order, probably).
-
 // The main proving engine. Returns: null (keep going), other (drop out)
 function answerQuestion(goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
     //DEBUG: print ("in main prove...\n");
@@ -346,12 +343,12 @@ function answerQuestion(goalList: Term[], environment: Environment, db: Database
             if (ret != null) return ret;
         }
 
-        if (renamedHead.cut) {
-            //print ("Debug: this goal "); thisTerm.print(); print(" has been cut.\n");
+        if (renamedHead.commit) {
+            //print ("Debug: this goal "); thisTerm.print(); print(" has been committed.\n");
             break;
         }
-        if (thisTerm.parent.cut) {
-            //print ("Debug: parent goal "); thisTerm.parent.print(); print(" has been cut.\n");
+        if (thisTerm.parent.commit) {
+            //print ("Debug: parent goal "); thisTerm.parent.print(); print(" has been committed.\n");
             break;
         }
     }
@@ -401,7 +398,7 @@ class Term {
     excludeThis?: boolean;
     excludeRule?: number;
     parent: Term;
-    cut?: boolean;
+    commit?: boolean;
 
     constructor(head: string, list: Part[]) {
         this.name = head;
@@ -442,10 +439,10 @@ class Term {
     static parse(tk: Tokeniser): Term | null {
         // Term -> [NOTTHIS] id ( optParamList )
 
-        if (tk.type == "punc" && tk.current == "!") {
-            // Parse ! as cut/0
+        if (/*tk.type == "id" && */tk.current == ops.cutCommit) {
+            // Parse bareword commit as commit/0
             tk = tk.consume();
-            return new Term("cut", []);
+            return new Term(ops.cutCommit, []);
         }
 
         let notthis = false;
@@ -816,7 +813,7 @@ function Comparitor(thisTerm: Term, goalList: Term[], environment: Environment, 
     return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
-function Cut(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
+function Commit(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
     //DEBUG print ("in Comparitor.prove()...\n");
     // Prove the builtin bit, then break out and prove
     // the remaining goalList.
@@ -832,9 +829,9 @@ function Cut(thisTerm: Term, goalList: Term[], environment: Environment, db: Dat
     // Just prove the rest of the goallist, recursively.
     const ret = answerQuestion(goalList, environment, db, level + 1, reportFunction);
 
-    // Backtracking through the 'cut' stops any further attempts to prove this subgoal.
-    //print ("Debug: backtracking through cut/0: thisTerm.parent = "); thisTerm.parent.print(); print("\n");
-    thisTerm.parent.cut = true;
+    // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
+    //print ("Debug: backtracking through commit/0: thisTerm.parent = "); thisTerm.parent.print(); print("\n");
+    thisTerm.parent.commit = true;
 
     return ret;
 }
