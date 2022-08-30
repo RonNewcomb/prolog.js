@@ -599,10 +599,11 @@ class Rule {
 
   print(): string {
     const retval: string[] = [];
-    if (this.head != null) retval.push(this.head.print());
-    if (this.head && this.body) retval.push(" " + ops.if + " ");
-    if (this.body != null) retval.push(this.body.print());
-    retval.push((this.asking ? ops.endQuestion : ops.endSentence) + "\n");
+    if (this.head) retval.push(this.head.print());
+    if (this.head && this.body) retval.push(ops.if);
+    if (this.body) retval.push(this.body.print());
+    retval.push(this.asking ? ops.endQuestion : ops.endSentence);
+    retval.push("\n");
     return retval.join(" ");
   }
 
@@ -614,23 +615,20 @@ class Rule {
 
     if (tk.current == ops.endSentence) return new Rule(head);
 
+    const expected = [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator];
     const questionIsImplied = hasTheImpliedQuestionVar(head);
+    if (!expected.includes(tk.current as ops) && !questionIsImplied && tk.type != "eof")
+      return consoleOutError("expected one of", expected.join(" "), " but found", tk.remainder);
+
     const endQuestionNow = tk.current == ops.endQuestion;
     const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator || questionIsImplied;
-    if (tk.current != ops.if && !isQuestion)
-      return consoleOutError(
-        "expected one of",
-        [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator].join(" "),
-        " but found",
-        tk.remainder
-      );
-
     if (tk.type == "eof") return new Rule(head, null, isQuestion);
     tk = tk.consume();
+
     const body = endQuestionNow ? null : Rule.parseBody(tk);
 
     if (!endQuestionNow && tk.current != ops.endSentence && tk.current != ops.endQuestion && !questionIsImplied)
-      return consoleOutError("expected one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
+      return consoleOutError("expected end of sentence with one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
 
     return new Rule(head, body, isQuestion);
   }
