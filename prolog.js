@@ -120,11 +120,8 @@ function printVars(variables, environment) {
 // The value of x in a given environment
 function value(x, env) {
     if (x.type == "Term") {
-        const l = [];
-        for (var i = 0; i < x.partlist.list.length; i++) {
-            l[i] = value(x.partlist.list[i], env);
-        }
-        return new Term(x.name, l);
+        const parts = x.partlist.list.map((each) => value(each, env));
+        return new Term(x.name, parts);
     }
     if (x.type != "Variable")
         return x; // We only need to check the values of variables...
@@ -175,7 +172,7 @@ function unify(x, y, env) {
 // Go through a list of terms (ie, a Body or Partlist's list) renaming variables
 // by appending 'level' to each variable name.
 // How non-graph-theoretical can this get?!?
-// "parent" points to the subgoal, the expansion of variables lead to these terms.
+// "parent" points to the subgoal, the expansion of which lead to these terms.
 function renameVariables(list, level, parent) {
     if (!Array.isArray(list)) {
         if (list.type == "Atom") {
