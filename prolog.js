@@ -101,24 +101,26 @@ function printEnv(env) {
         return;
     }
     let k = false;
-    for (var i in env) {
+    for (const i in env) {
         k = true;
         print(" " + i + " = ");
         env[i].print();
         print("\n");
     }
     if (!k)
-        print("true\n");
+        print("Yes.\n");
 }
 function printVars(which, environment) {
     // Print bindings.
     if (which.length == 0) {
-        print("true\n");
+        print("Yes.\n");
     }
     else {
         for (var i = 0; i < which.length; i++) {
-            print(which[i].name);
-            print(" = ");
+            if (which[i].name != "?" /* impliedQuestionVar */) {
+                print(which[i].name);
+                print(" is ");
+            }
             (value(new Variable(which[i].name + ".0"), environment)).print();
             print("\n");
         }
@@ -547,11 +549,13 @@ class Rule {
             return consoleOutError("syntax error");
         if (tk.current == "." /* endSentence */)
             return new Rule(head);
-        const endQuestionNow = tk.current == "?" /* endQuestion */;
         const questionIsImplied = hasTheImpliedQuestionVar(head);
+        const endQuestionNow = tk.current == "?" /* endQuestion */;
         const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
         if (tk.current != "if" /* if */ && !isQuestion)
             return consoleOutError("expected one of", ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */].join(' '), " but found", tk.remainder);
+        if (tk.type == 'eof')
+            return new Rule(head, null, isQuestion);
         tk = tk.consume();
         const body = endQuestionNow ? null : Rule.parseBody(tk);
         if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
@@ -594,8 +598,10 @@ class Tokeniser {
         this.consume(); // Load up the first token.
     }
     consume() {
-        if (this.type == "eof")
+        if (this.type == "eof") {
+            console.warn("Tried to consume eof");
             return this;
+        }
         // Eat any leading WS
         let r = this.remainder.match(/^\s*(.*)$/);
         if (r) {

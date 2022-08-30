@@ -137,23 +137,25 @@ function printEnv(env: { [key: string]: { print: () => void } } | null) {
         return;
     }
     let k = false;
-    for (var i in env) {
+    for (const i in env) {
         k = true;
         print(" " + i + " = ");
         env[i].print();
         print("\n");
     }
-    if (!k) print("true\n");
+    if (!k) print("Yes.\n");
 }
 
 function printVars(which: Variable[], environment: Environment) {
     // Print bindings.
     if (which.length == 0) {
-        print("true\n");
+        print("Yes.\n");
     } else {
         for (var i = 0; i < which.length; i++) {
-            print(which[i].name);
-            print(" = ");
+            if (which[i].name != ops.impliedQuestionVar) {
+                print(which[i].name);
+                print(" is ");
+            }
             (value(new Variable(which[i].name + ".0"), environment)).print();
             print("\n");
         }
@@ -641,11 +643,12 @@ class Rule {
 
         if (tk.current == ops.endSentence) return new Rule(head);
 
-        const endQuestionNow = tk.current == ops.endQuestion;
         const questionIsImplied = hasTheImpliedQuestionVar(head);
+        const endQuestionNow = tk.current == ops.endQuestion;
         const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator || questionIsImplied;
         if (tk.current != ops.if && !isQuestion) return consoleOutError("expected one of", [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator].join(' '), " but found", tk.remainder);
 
+        if (tk.type == 'eof') return new Rule(head, null, isQuestion);
         tk = tk.consume();
         const body = endQuestionNow ? null : Rule.parseBody(tk);
 
@@ -700,7 +703,10 @@ class Tokeniser {
     }
 
     consume(): this {
-        if (this.type == "eof") return this;
+        if (this.type == "eof") {
+            console.warn("Tried to consume eof");
+            return this;
+        }
 
         // Eat any leading WS
         let r: RegExpMatchArray | null = this.remainder.match(/^\s*(.*)$/);
