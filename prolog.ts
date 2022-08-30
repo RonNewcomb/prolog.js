@@ -451,11 +451,8 @@ class Term {
       return new Term(ops.cutCommit, []);
     }
 
-    let notthis = false;
-    if (tk.current == ops.notThis) {
-      notthis = true;
-      tk = tk.consume();
-    }
+    let notthis = tk.current == ops.notThis;
+    if (notthis) tk = tk.consume();
 
     if (tk.type != "punc" || tk.current != ops.open) return consoleOutError("expected [ to begin");
     tk = tk.consume();
@@ -485,12 +482,7 @@ class Partlist {
   }
 
   print(): string {
-    const retval: string[] = [];
-    for (let i = 0; i < this.list.length; i++) {
-      retval.push(", ");
-      retval.push(this.list[i].print());
-    }
-    return retval.join("");
+    return this.list.map((each) => ", " + each.print()).join("");
   }
 
   static parse(tk: Tokeniser): Part[] | null {

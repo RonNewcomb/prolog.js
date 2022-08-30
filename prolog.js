@@ -119,28 +119,27 @@ function printVars(variables, environment) {
 }
 // The value of x in a given environment
 function value(x, env) {
-    if (x.type == "Term") {
-        const parts = x.partlist.list.map((each) => value(each, env));
-        return new Term(x.name, parts);
+    switch (x.type) {
+        case "Term":
+            const parts = x.partlist.list.map((each) => value(each, env));
+            return new Term(x.name, parts);
+        case "Atom":
+            return x; // We only need to check the values of variables...
+        case "Variable":
+            const binding = env[x.name];
+            return binding == null ? x : value(binding, env);
     }
-    if (x.type != "Variable")
-        return x; // We only need to check the values of variables...
-    const binding = env[x.name];
-    if (binding == null)
-        return x; // Just the variable, no binding.
-    return value(binding, env);
 }
-// Give a new environment from the old with "n" (a string variable name) bound to "z" (a part)
-// Part is Atom|Term|Variable
-function newEnv(n, z, e) {
-    // We assume that n has been 'unwound' or 'followed' as far as possible
+// Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
+function newEnv(name, part, oldEnv) {
+    // We assume that name has been 'unwound' or 'followed' as far as possible
     // in the environment. If this is not the case, we could get an alias loop.
-    const ne = {};
-    ne[n] = z;
-    for (var i in e)
-        if (i != n)
-            ne[i] = e[i];
-    return ne;
+    const newEnv = {};
+    newEnv[name] = part;
+    for (const othername in oldEnv)
+        if (othername != name)
+            newEnv[othername] = oldEnv[othername];
+    return newEnv;
 }
 // More substantial utility functions.
 // Unify two terms in the current environment. Returns a new environment.
@@ -153,10 +152,7 @@ function unify(x, y, env) {
     if (y.type == "Variable")
         return newEnv(y.name, x, env);
     if (x.type == "Atom" || y.type == "Atom")
-        if (x.type == y.type && x.name == y.name)
-            return env;
-        else
-            return null;
+        return x.type == y.type && x.name == y.name ? env : null;
     // x.type == y.type == Term...
     if (x.name != y.name)
         return null; // Ooh, so first-order.
@@ -182,14 +178,14 @@ function renameVariables(list, level, parent) {
             return new Variable(list.name + "." + level);
         }
         else if (list.type == "Term") {
-            let out = new Term(list.name, renameVariables(list.partlist.list, level, parent));
+            const out = new Term(list.name, renameVariables(list.partlist.list, level, parent));
             out.parent = parent;
             return out;
         }
         return [];
     }
     else {
-        let out = [];
+        const out = [];
         for (var i = 0; i < list.length; i++) {
             out[i] = renameVariables(list[i], level, parent);
             /*
@@ -314,45 +310,45 @@ function answerQuestion(goalList, environment, db, level, reportFunction) {
 }
 class Variable {
     constructor(head) {
-        this.name = head;
-        this.print = function () {
-            return this.name;
-        };
         this.type = "Variable";
+        this.name = head;
+    }
+    print() {
+        return this.name;
     }
 }
 class Atom {
     constructor(head) {
-        this.name = head;
-        this.print = function () {
-            return this.name;
-        };
         this.type = "Atom";
+        this.name = head;
+    }
+    print() {
+        return this.name;
     }
 }
 class Term {
     constructor(head, list) {
+        this.type = "Term";
         this.name = head;
         this.partlist = new Partlist(list);
-        this.type = "Term";
         this.parent = this;
     }
     print() {
         const retval = [];
-        if (this.name == "cons") {
+        if (this.name == "cons" /* cons */) {
             let part = this;
-            while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
+            while (part.type == "Term" && part.name == "cons" /* cons */ && part.partlist.list.length == 2) {
                 part = part.partlist.list[1];
             }
             if ((part.type == "Atom" && part.name == "nothing" /* nothing */) || part.type == "Variable") {
                 part = this;
                 retval.push("{" /* openList */);
-                let com = false;
-                while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
-                    if (com)
+                let comma = false;
+                while (part.type == "Term" && part.name == "cons" /* cons */ && part.partlist.list.length == 2) {
+                    if (comma)
                         retval.push(", ");
                     retval.push(part.partlist.list[0].print());
-                    com = true;
+                    comma = true;
                     part = part.partlist.list[1];
                 }
                 if (part.type == "Variable") {
@@ -376,7 +372,7 @@ class Term {
             return new Term("commit" /* cutCommit */, []);
         }
         let notthis = false;
-        if (tk.current == "NOTTHIS") {
+        if (tk.current == "NOTTHIS" /* notThis */) {
             notthis = true;
             tk = tk.consume();
         }
@@ -391,23 +387,11 @@ class Term {
             tk = tk.consume();
         else if (tk.current != "]")
             return consoleOutError("expected , or ] after first term. Current=", tk.current);
-        const parts = [];
-        while (tk.current != "]") {
-            if (tk.type == "eof")
-                return consoleOutError("unexpected EOF while running through terms until", "]" /* close */);
-            const part = Partlist.parse1(tk);
-            if (part == null)
-                return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
-            if (tk.current == ",")
-                tk = tk.consume();
-            else if (tk.current != "]")
-                return consoleOutError("a term, a part, ended before the , or the ]   remaining: ", tk.remainder);
-            parts.push(part);
-        }
-        tk = tk.consume();
+        const parts = Partlist.parse(tk);
+        if (!parts)
+            return null;
         const term = new Term(name, parts);
-        if (notthis)
-            term.excludeThis = true;
+        term.excludeThis = notthis;
         return term;
     }
 }
@@ -422,6 +406,23 @@ class Partlist {
             retval.push(this.list[i].print());
         }
         return retval.join("");
+    }
+    static parse(tk) {
+        const parts = [];
+        while (tk.current != "]" /* close */) {
+            if (tk.type == "eof")
+                return consoleOutError("unexpected EOF while running through terms until", "]" /* close */);
+            const part = Partlist.parse1(tk);
+            if (part == null)
+                return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
+            if (tk.current == ",")
+                tk = tk.consume();
+            else if (tk.current != "]" /* close */)
+                return consoleOutError("a term, a part, ended before the , or the ]   remaining: ", tk.remainder);
+            parts.push(part);
+        }
+        tk = tk.consume();
+        return parts;
     }
     // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
     static parse1(tk) {
@@ -469,7 +470,7 @@ class Partlist {
             tk = tk.consume();
             // Return the new cons.... of all this rubbish.
             for (--i; i >= 0; i--)
-                append = new Term("cons", [parts[i], append]);
+                append = new Term("cons" /* cons */, [parts[i], append]);
             return append;
         }
         const openbracket = tk.type == "punc" && tk.current == "[" /* open */;
@@ -482,22 +483,9 @@ class Partlist {
         if (tk.current != ",")
             return consoleOutError("expected , after symbol");
         tk = tk.consume();
-        const parts = [];
-        let i = 0;
-        while (tk.current != "]" /* close */) {
-            if (tk.type == "eof")
-                return null;
-            const part = Partlist.parse1(tk);
-            if (part == null)
-                return null;
-            if (tk.current == ",")
-                tk = tk.consume();
-            else if (tk.current != "]" /* close */)
-                return null;
-            // Add the current Part onto the list...
-            parts[i++] = part;
-        }
-        tk = tk.consume();
+        const parts = Partlist.parse(tk);
+        if (!parts)
+            return null;
         return new Term(name, parts);
     }
 }
@@ -770,7 +758,7 @@ function BagOf(thisTerm, goalList, environment, db, level, reportFunction) {
       print("]\n");
       */
     for (var i = anslist.length; i > 0; i--)
-        answers = new Term("cons", [anslist[i - 1], answers]);
+        answers = new Term("cons" /* cons */, [anslist[i - 1], answers]);
     //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
     const env2 = unify(into, answers, environment);
     if (env2 == null) {
@@ -816,7 +804,7 @@ function ExternalJS(thisTerm, goalList, environment, db, level, reportFunction) 
     // Get the second term, the argument list.
     let second = value(thisTerm.partlist.list[1], environment);
     let i = 1;
-    while (second.type == "Term" && second.name == "cons") {
+    while (second.type == "Term" && second.name == "cons" /* cons */) {
         // Go through second an argument at a time...
         const arg = value(second.partlist.list[0], environment);
         if (arg.type != "Atom") {
@@ -867,7 +855,7 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
     // Get the second term, the argument list.
     let second = value(thisTerm.partlist.list[1], environment);
     let i = 1;
-    while (second.type == "Term" && second.name == "cons") {
+    while (second.type == "Term" && second.name == "cons" /* cons */) {
         // Go through second an argument at a time...
         const arg = value(second.partlist.list[0], environment);
         if (arg.type != "Atom") {
