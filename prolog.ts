@@ -510,13 +510,12 @@ class Partlist {
     if (tk.type == "var") {
       const varName = tk.current;
       tk = tk.consume();
-      return new Variable(varName!);
+      return new Variable(varName);
     }
 
+    // destructure a list
     if (tk.type == "punc" && tk.current == ops.openList) {
       tk = tk.consume();
-
-      // destructure a list
 
       // Special case: {} = new atom(nothing).
       if (tk.type == "punc" && tk.current == ops.closeList) {
@@ -524,15 +523,12 @@ class Partlist {
         return new Atom(ops.nothing);
       }
 
-      // Get a list of parts into l
+      // Get a list of parts
       const parts = [];
-      let i = 0;
-
       while (true) {
         const part = Partlist.parse1(tk);
         if (part == null) return consoleOutError("subpart didn't parse:", tk.current);
-
-        parts[i++] = part;
+        parts.push(part);
         if (tk.current != ",") break;
         tk = tk.consume();
       }
@@ -550,7 +546,7 @@ class Partlist {
       if (tk.current != ops.closeList) return consoleOutError("list destructure wasn't ended by }");
       tk = tk.consume();
       // Return the new cons.... of all this rubbish.
-      for (--i; i >= 0; i--) append = new Term(ops.cons, [parts[i], append]);
+      for (let i = parts.length - 1; i >= 0; i--) append = new Term(ops.cons, [parts[i], append]);
       return append;
     }
 
@@ -560,7 +556,7 @@ class Partlist {
     const name = tk.current;
     tk = tk.consume();
 
-    if (!openbracket) return new Atom(name!);
+    if (!openbracket) return new Atom(name);
 
     if (tk.current != ",") return consoleOutError("expected , after symbol");
     tk = tk.consume();
@@ -680,13 +676,13 @@ function hasTheImpliedQuestionVar(term: Part): boolean {
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
   remainder: string;
-  current: string | null;
-  type: null | "eof" | "id" | "var" | "punc";
+  current: string;
+  type: "" | "eof" | "id" | "var" | "punc";
 
-  constructor(string: string) {
-    this.remainder = string;
-    this.current = null;
-    this.type = null; // "eof", "id", "var", "punc" etc.
+  constructor(line: string) {
+    this.remainder = line;
+    this.current = "";
+    this.type = ""; // "eof", "id", "var", "punc" etc.
     this.consume(); // Load up the first token.
   }
 
@@ -703,7 +699,7 @@ class Tokeniser {
     }
 
     if (this.remainder == "") {
-      this.current = null;
+      this.current = "";
       this.type = "eof";
       return this;
     }
@@ -763,7 +759,7 @@ class Tokeniser {
     }
 
     // eof?
-    this.current = null;
+    this.current = "";
     this.type = "eof";
     return this;
   }
