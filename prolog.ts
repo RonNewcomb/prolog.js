@@ -17,7 +17,7 @@ interface ReportFunction {
   (env: Environment): void;
 }
 interface Functor {
-  (thisTerm: Term, goalList: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult;
+  (thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult;
 }
 
 const database: Database = [] as Database;
@@ -59,7 +59,6 @@ function printUserline(str: string) {
   const div = newConsoleLine();
   div.classList.add("userdiv");
   div.innerHTML = "<span>" + str + "</span>";
-  newConsoleLine();
 }
 
 function printEcholine(str: string) {
@@ -67,14 +66,12 @@ function printEcholine(str: string) {
   const div = newConsoleLine();
   div.classList.add("echodiv");
   div.innerHTML = "<span>" + str + "</span>";
-  newConsoleLine();
 }
 
 function printAnswerline(str: string) {
   const div = newConsoleLine();
   div.classList.add("answerdiv");
   div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
-  newConsoleLine();
 }
 
 function consoleOutError(...rest: any[]): null {
@@ -101,7 +98,7 @@ function onCommandlineKey(event: any, el: HTMLInputElement) {
 }
 
 // called from HTML on startup
-function bootstrap() {
+function init() {
   printAnswerline("\nAttaching builtins to database.\n");
   database.builtin = {};
   database.builtin["compare/3"] = Comparitor;
@@ -117,23 +114,29 @@ function bootstrap() {
   nextlines(document.rules.rules.value);
 }
 
-function nextlines(text: string, el?: HTMLTextAreaElement) {
-  if (el) el.value = "";
+function nextlines(text: string) {
   text.split("\n").forEach(nextline);
 }
 
 function nextline(line: string): Database {
+  if (!line || line.match(/^\s+$/)) return database;
   printUserline(line);
-  if (!line) return database;
   previousInput = line;
-  if (line.substring(0, 1) == ops.comment || line == "" || line.match(/^\s*$/)) return database;
+  if (line.match(/^\s*#/)) return database; //== ops.comment
   const rule = Rule.parse(new Tokeniser(line));
   if (rule == null) return database;
-  database.push(rule);
   printEcholine(rule.print());
-  if (rule.asking && rule.body) {
-    const vs = varNames(rule.body.list);
-    answerQuestion(renameVariables(rule.body.list, 0, []) as Term[], {} as Environment, database, 1, (env) => printVars(vs, env));
+  if (rule.asking) {
+    let reported = false;
+    const reportFn = (env: Environment) => {
+      reported = true;
+      printVars(varNames(rule.body!.list), env);
+    };
+    answerQuestion(renameVariables(rule.body!.list, 0, []) as Term[], {} as Environment, database, 1, reportFn);
+    if (!reported) printAnswerline("No.\n");
+  } else {
+    database.push(rule);
+    printAnswerline("Memorized.\n");
   }
   return database;
 }
@@ -144,7 +147,7 @@ function nextline(line: string): Database {
 function printEnv(env?: { [key: string]: Part }) {
   if (!env) return printAnswerline(ops.nothing + ".\n");
   const retval: string[] = Object.entries(env).map(([name, part]) => ` ${name} = ${part.print()}\n`);
-  printAnswerline(retval.length ? retval.join("") : "Yes.\n");
+  printAnswerline(retval.length ? retval.join("") : "Yess.\n");
 }
 
 // Print bindings.
@@ -160,6 +163,7 @@ function printVars(variables: Variable[], environment: Environment): void {
     retval.push(value(new Variable(variable.name + ".0"), environment).print());
     retval.push("\n");
   }
+  if (retval.length == 0) return printAnswerline("No.\n\n");
   retval.push("\n");
   printAnswerline(retval.join(""));
 }
@@ -254,17 +258,10 @@ function varNames(parts: Part[]): Variable[] {
 
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
-function answerQuestion(
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function answerQuestion(goalList: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //DEBUG: print ("in main prove...\n");
   if (goalList.length == 0) {
-    reportFunction(environment);
-
+    onReport(env);
     //if (!more) return "done";
     return null;
   }
@@ -287,10 +284,10 @@ function answerQuestion(
     let newGoals = [];
     let j;
     for (j = 1; j < goalList.length; j++) newGoals[j - 1] = goalList[j];
-    return builtin(thisTerm, newGoals, environment, db, level + 1, reportFunction);
+    return builtin(thisTerm, newGoals, env, db, level + 1, onReport);
   }
 
-  for (var i = 0; i < db.length; i++) {
+  for (let i = 0; i < db.length; i++) {
     //print ("Debug: in rule selection. thisTerm = "); thisTerm.print(); print ("\n");
     if (thisTerm.excludeRule == i) {
       // print("DEBUG: excluding rule number "+i+" in attempt to satisfy "); thisTerm.print(); print("\n");
@@ -300,45 +297,45 @@ function answerQuestion(
     const rule: Rule = db[i];
     if (!rule.head) continue;
 
-    // We'll need better unification to allow the 2nd-order
-    // rule matching ... later.
-    if (rule.head.name != thisTerm.name) continue;
+    if (rule.head.name != thisTerm.name) {
+      //consoleOutError("DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
+      continue;
+    }
 
     // Rename the variables in the head and body
     const renamedHead = new Term(rule.head.name, renameVariables(rule.head.partlist.list, level, thisTerm) as Part[]);
     // renamedHead.ruleNumber = i;
 
-    const env2 = unify(thisTerm, renamedHead, environment);
+    const env2 = unify(thisTerm, renamedHead, env);
     if (env2 == null) continue;
 
-    const body = rule.body;
-    if (body != null) {
-      const newFirstGoals = renameVariables(rule.body!.list, level, renamedHead) as Part[];
+    if (rule.body != null) {
+      const newFirstGoals = renameVariables(rule.body.list, level, renamedHead) as Part[];
       // Stick the new body list
       let newGoals: Term[] = [];
       let j: number, k: number;
       for (j = 0; j < newFirstGoals.length; j++) {
         newGoals[j] = newFirstGoals[j] as Term;
-        if (rule.body!.list[j].excludeThis) newGoals[j].excludeRule = i;
+        if (rule.body.list[j].excludeThis) newGoals[j].excludeRule = i;
       }
       for (k = 1; k < goalList.length; k++) newGoals[j++] = goalList[k];
-      const ret = answerQuestion(newGoals, env2, db, level + 1, reportFunction);
+      const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
       if (ret != null) return ret;
     } else {
       // Just prove the rest of the goallist, recursively.
       let newGoals: Term[] = [];
       let j: number;
       for (j = 1; j < goalList.length; j++) newGoals[j - 1] = goalList[j];
-      const ret = answerQuestion(newGoals, env2, db, level + 1, reportFunction);
+      const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
       if (ret != null) return ret;
     }
 
     if (renamedHead.commit) {
-      //print ("Debug: this goal "); thisTerm.print(); print(" has been committed.\n");
+      //print ("Debug: this goal " + thisTerm.print() + " has been committed.\n");
       break;
     }
     if (thisTerm.parent.commit) {
-      //print ("Debug: parent goal "); thisTerm.parent.print(); print(" has been committed.\n");
+      //print ("Debug: parent goal " + thisTerm.parent.print() + " has been committed.\n");
       break;
     }
   }
@@ -819,21 +816,14 @@ function Commit(
 }
 
 // Given a single argument, it sticks it on the goal list.
-function Call(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function Call(thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Prove the builtin bit, then break out and prove
   // the remaining goalList.
 
   // Rename the variables in the head and body
   // var renamedHead = new Term(rule.head.name, renameVariables(rule.head.partlist.list, level));
 
-  const first: Part = value(thisTerm.partlist.list[0], environment);
+  const first: Part = value(thisTerm.partlist.list[0], env);
   if (first.type != "Term") {
     //print("Debug: Call needs parameter bound to a Term, failing\n");
     return null;
@@ -848,38 +838,24 @@ function Call(
   (first as Term).parent = thisTerm;
 
   let j;
-  for (j = 0; j < goalList.length; j++) newGoals[j + 1] = goalList[j];
+  for (j = 0; j < goals.length; j++) newGoals[j + 1] = goals[j];
 
   // Just prove the rest of the goallist, recursively.
-  return answerQuestion(newGoals, environment, db, level + 1, reportFunction);
+  return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 
-function Fail(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): null {
-  return null;
+function Fail(thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  return null; // TODO shouldn't this return True or something?
 }
 
 type AnswerList = Part[] & { renumber?: number };
 
-function BagOf(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function BagOf(thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // bagof(Term, ConditionTerm, ReturnList)
 
-  let collect: Part = value(thisTerm.partlist.list[0], environment);
-  const subgoal = value(thisTerm.partlist.list[1], environment) as Term;
-  const into = value(thisTerm.partlist.list[2], environment);
+  let collect: Part = value(thisTerm.partlist.list[0], env);
+  const subgoal = value(thisTerm.partlist.list[1], env) as Term;
+  const into = value(thisTerm.partlist.list[2], env);
 
   collect = renameVariables(collect, level, thisTerm) as Part;
   const newGoal = new Term(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTerm) as Part[]);
@@ -891,7 +867,7 @@ function BagOf(
   // Prove this subgoal, collecting up the environments...
   const anslist = [] as AnswerList;
   anslist.renumber = -1;
-  const ret = answerQuestion(newGoals, environment, db, level + 1, BagOfCollectFunction(collect, anslist));
+  const ret = answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, anslist));
 
   // Turn anslist into a proper list and unify with 'into'
 
@@ -910,7 +886,7 @@ function BagOf(
   for (var i = anslist.length; i > 0; i--) answers = new Term(ops.cons, [anslist[i - 1], answers]);
 
   //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
-  const env2 = unify(into, answers, environment);
+  const env2 = unify(into, answers, env);
 
   if (env2 == null) {
     //print("Debug: bagof cannot unify anslist with "); into.print(); print(", failing\n");
@@ -918,7 +894,7 @@ function BagOf(
   }
 
   // Just prove the rest of the goallist, recursively.
-  return answerQuestion(goalList, env2, db, level + 1, reportFunction);
+  return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
 // Aux function: return the reportFunction to use with a bagof subgoal
@@ -943,18 +919,11 @@ function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunctio
 // first: a template string that uses $1, $2, etc. as placeholders for
 const EvalContext: any[] = [];
 
-function ExternalJS(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function ExternalJS(thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //print ("DEBUG: in External...\n");
 
   // Get the first term, the template.
-  const first = value(thisTerm.partlist.list[0], environment);
+  const first = value(thisTerm.partlist.list[0], env);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -966,11 +935,11 @@ function ExternalJS(
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second term, the argument list.
-  let second: Part = value(thisTerm.partlist.list[1], environment);
+  let second: Part = value(thisTerm.partlist.list[1], env);
   let i = 1;
   while (second.type == "Term" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = value((second as Term).partlist.list[0], environment);
+    const arg = value((second as Term).partlist.list[0], env);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -998,7 +967,7 @@ function ExternalJS(
   if (!ret) ret = ops.nothing;
 
   // Convert back into an atom...
-  const env2 = unify(thisTerm.partlist.list[2], new Atom(ret), environment);
+  const env2 = unify(thisTerm.partlist.list[2], new Atom(ret), env);
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
@@ -1006,21 +975,21 @@ function ExternalJS(
   }
 
   // Just prove the rest of the goallist, recursively.
-  return answerQuestion(goalList, env2, db, level + 1, reportFunction);
+  return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
 function ExternalAndParse(
   thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
+  goals: Term[],
+  env: Environment,
   db: Database,
   level: number,
-  reportFunction: ReportFunction
+  onReport: ReportFunction
 ): FunctorResult {
   //print ("DEBUG: in External...\n");
 
   // Get the first term, the template.
-  const first = value(thisTerm.partlist.list[0], environment);
+  const first = value(thisTerm.partlist.list[0], env);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -1032,11 +1001,11 @@ function ExternalAndParse(
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second term, the argument list.
-  let second: Part = value(thisTerm.partlist.list[1], environment);
+  let second: Part = value(thisTerm.partlist.list[1], env);
   let i = 1;
   while (second.type == "Term" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = value((second as Term).partlist.list[0], environment);
+    const arg = value((second as Term).partlist.list[0], env);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -1067,7 +1036,7 @@ function ExternalAndParse(
   const part = Partlist.parse1(new Tokeniser(ret));
   //print("DEBUG: external2, ret = "); ret.print(); print(".\n");
 
-  const env2 = unify(thisTerm.partlist.list[2], part!, environment);
+  const env2 = unify(thisTerm.partlist.list[2], part!, env);
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
@@ -1075,9 +1044,9 @@ function ExternalAndParse(
   }
 
   // Just prove the rest of the goallist, recursively.
-  return answerQuestion(goalList, env2, db, level + 1, reportFunction);
+  return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
 // run program
-bootstrap();
+init();
 commandLineEl.focus();
