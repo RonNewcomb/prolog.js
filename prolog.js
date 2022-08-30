@@ -1,3 +1,5 @@
+const database = [];
+// web browser IDE things /////
 const commandLineEl = document.getElementById("commandline");
 const consoleOutEl = document.getElementById("consoleout");
 function newConsoleLine() {
@@ -35,7 +37,6 @@ function consoleOutError(...rest) {
     newConsoleLine();
     return null;
 }
-const database = [];
 let previousInput = "";
 function onCommandlineKey(event, el) {
     switch (event.key) {
@@ -83,15 +84,9 @@ function nextline(line) {
     printEcholine(rule.print());
     if (rule.asking && rule.body) {
         const vs = varNames(rule.body.list);
-        answerQuestion(renameVariables(rule.body.list, 0, []), {}, database, 1, applyOne(printVars, vs));
+        answerQuestion(renameVariables(rule.body.list, 0, []), {}, database, 1, (env) => printVars(vs, env));
     }
     return database;
-}
-// Functional programming bits... Currying and suchlike
-function applyOne(f, arg1) {
-    return function (arg2) {
-        return f(arg1, arg2);
-    };
 }
 // Some auxiliary bits and pieces... environment-related.
 // Print out an environment's contents.
@@ -439,7 +434,7 @@ class Partlist {
             while (true) {
                 const part = Partlist.parse1(tk);
                 if (part == null)
-                    return consoleOutError("subpart didn't parse:", tk.current);
+                    return consoleOutError("can't understand this part of a list destructuring:", tk.remainder);
                 parts.push(part);
                 if (tk.current != ",")
                     break;
@@ -514,8 +509,8 @@ class Rule {
         retval.push("\n");
         return retval.join(" ");
     }
+    // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
     static parse(tk) {
-        // A rule is a Head followed by . or by :- Body
         const head = Rule.parseHead(tk);
         if (!head)
             return consoleOutError("syntax error");
@@ -540,19 +535,17 @@ class Rule {
         return Term.parse(tk);
     }
     static parseBody(tk) {
-        // Body -> Term {, Term...}
         const terms = [];
-        let i = 0;
-        let term;
-        while ((term = Term.parse(tk)) != null) {
-            terms[i++] = term;
+        while (true) {
+            const term = Term.parse(tk);
+            if (term == null)
+                break;
+            terms.push(term);
             if (tk.current != ",")
                 break;
             tk = tk.consume();
         }
-        if (i == 0)
-            return null;
-        return terms;
+        return terms.length == 0 ? null : terms;
     }
 }
 function hasTheImpliedQuestionVar(term) {
@@ -880,5 +873,6 @@ function ExternalAndParse(thisTerm, goalList, environment, db, level, reportFunc
     // Just prove the rest of the goallist, recursively.
     return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
+// run program
 bootstrap();
 commandLineEl.focus();

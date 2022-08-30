@@ -6,6 +6,22 @@ interface Document {
 }
 //}
 
+// types ///////////////
+
+type Database = Rule[] & { builtin?: { [key: string]: Functor } };
+type FunctorResult = null | boolean;
+interface Environment {
+  [name: string]: Part;
+}
+interface ReportFunction {
+  (env: Environment): void;
+}
+interface Functor {
+  (thisTerm: Term, goalList: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult;
+}
+
+const database: Database = [] as Database;
+
 // these aren't used in the regexes in  class Tokeniser !!
 const enum ops {
   open = "[",
@@ -25,6 +41,8 @@ const enum ops {
   notThis = "NOTTHIS",
   cons = "cons",
 }
+
+// web browser IDE things /////
 
 const commandLineEl: HTMLInputElement = document.getElementById("commandline")! as HTMLInputElement;
 const consoleOutEl: HTMLDivElement = document.getElementById("consoleout")! as HTMLDivElement;
@@ -67,19 +85,6 @@ function consoleOutError(...rest: any[]): null {
   return null;
 }
 
-type Database = Rule[] & { builtin?: { [key: string]: Functor } };
-type FunctorResult = null | boolean;
-interface Environment {
-  [name: string]: Part;
-}
-interface ReportFunction {
-  (env: Environment): void;
-}
-interface Functor {
-  (thisTerm: Term, goalList: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult;
-}
-
-const database: Database = [] as Database;
 let previousInput = "";
 
 function onCommandlineKey(event: any, el: HTMLInputElement) {
@@ -128,19 +133,12 @@ function nextline(line: string): Database {
   printEcholine(rule.print());
   if (rule.asking && rule.body) {
     const vs = varNames(rule.body.list);
-    answerQuestion(renameVariables(rule.body.list, 0, []) as Term[], {} as Environment, database, 1, applyOne(printVars, vs));
+    answerQuestion(renameVariables(rule.body.list, 0, []) as Term[], {} as Environment, database, 1, (env) => printVars(vs, env));
   }
   return database;
 }
 
-// Functional programming bits... Currying and suchlike
-function applyOne(f: Function, arg1: any) {
-  return function (arg2: any) {
-    return f(arg1, arg2);
-  };
-}
-
-// Some auxiliary bits and pieces... environment-related.
+// environment ///////
 
 // Print out an environment's contents.
 function printEnv(env?: { [key: string]: Part }) {
@@ -250,22 +248,24 @@ function renameVariables(list: Part[] | Part, level: number, parent: Term[] | Te
 }
 
 // Return a list of all variables mentioned in a list of Terms.
-function varNames(list: Part[]): (Variable | Term)[] {
-  const out: (Variable | Term)[] = [];
-
-  main: for (var i = 0; i < list.length; i++) {
-    if (list[i].type == "Variable") {
-      for (var j = 0; j < out.length; j++) if (out[j].name == list[i].name) continue main;
-      out[out.length] = list[i] as Variable;
-    } else if (list[i].type == "Term") {
-      const o2 = varNames((list[i] as Term).partlist.list);
-      inner: for (var j = 0; j < o2.length; j++) {
-        for (var k = 0; k < out.length; k++) if (o2[j].name == out[k].name) continue inner;
-        out[out.length] = o2[j];
-      }
-    } // else Atom but nothing to do...
+function varNames(parts: Part[]): Variable[] {
+  const variables: Variable[] = [];
+  for (const part of parts) {
+    switch (part.type) {
+      case "Atom":
+        continue;
+      case "Variable":
+        if (!variables.find((o) => o.name == part.name)) variables.push(part);
+        continue;
+      case "Term":
+        const nestedVariables = varNames(part.partlist.list);
+        for (const nestedVariable of nestedVariables) {
+          if (!variables.find((o) => o.name == nestedVariable.name)) variables.push(nestedVariable);
+        }
+        continue;
+    }
   }
-  return out;
+  return variables;
 }
 
 // The meat of this thing... js-tinyProlog.
@@ -527,7 +527,7 @@ class Partlist {
       const parts = [];
       while (true) {
         const part = Partlist.parse1(tk);
-        if (part == null) return consoleOutError("subpart didn't parse:", tk.current);
+        if (part == null) return consoleOutError("can't understand this part of a list destructuring:", tk.remainder);
         parts.push(part);
         if (tk.current != ",") break;
         tk = tk.consume();
@@ -564,7 +564,7 @@ class Partlist {
     const parts = Partlist.parse(tk);
     if (!parts) return null;
 
-    return new Term(name!, parts);
+    return new Term(name, parts);
   }
 }
 
@@ -607,9 +607,8 @@ class Rule {
     return retval.join(" ");
   }
 
+  // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
   static parse(tk: Tokeniser): Rule | null {
-    // A rule is a Head followed by . or by :- Body
-
     const head = Rule.parseHead(tk);
     if (!head) return consoleOutError("syntax error");
 
@@ -639,9 +638,7 @@ class Rule {
   }
 
   static parseBody(tk: Tokeniser): Term[] | null {
-    // Body -> Term {, Term...}
     const terms: Term[] = [];
-
     while (true) {
       const term = Term.parse(tk);
       if (term == null) break;
@@ -649,7 +646,6 @@ class Rule {
       if (tk.current != ",") break;
       tk = tk.consume();
     }
-
     return terms.length == 0 ? null : terms;
   }
 }
@@ -1098,5 +1094,6 @@ function ExternalAndParse(
   return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
+// run program
 bootstrap();
 commandLineEl.focus();
