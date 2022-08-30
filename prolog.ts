@@ -19,6 +19,8 @@ const enum ops {
     if = 'if',
     query = '?-',
     comment = '#',
+    bodyTermSeparator = ',',
+    paramSeparator = ',',
 }
 
 const commandLineEl: HTMLInputElement = document.getElementById('commandline')! as HTMLInputElement;
@@ -51,11 +53,12 @@ function printUserline(str: string) {
     newConsoleLine();
 }
 
-function consoleOutError(...rest: (any)[]) {
+function consoleOutError(...rest: (any)[]): null {
     const div = newConsoleLine();
     div.classList.add('errdiv');
     div.innerHTML = '<span class=err>' + rest.join(' ') + '</span>';
     newConsoleLine();
+    return null;
 }
 
 type FunctorResult = null | boolean;
@@ -308,6 +311,7 @@ function answerQuestion(goalList: Term[], environment: Environment, db: Database
         }
 
         const rule: Rule = db[i];
+        if (!rule.head) continue;
 
         // We'll need better unification to allow the 2nd-order
         // rule matching ... later.
@@ -438,7 +442,6 @@ class Term {
     static parse(tk: Tokeniser): Term | null {
         // Term -> [NOTTHIS] id ( optParamList )
 
-
         if (tk.type == "punc" && tk.current == "!") {
             // Parse ! as cut/0
             tk = tk.consume();
@@ -451,44 +454,28 @@ class Term {
             tk = tk.consume();
         }
 
-        if (tk.type != "punc" || tk.current != ops.open) {
-            consoleOutError("expected [ to begin");
-            return null;
-        }
+        if (tk.type != "punc" || tk.current != ops.open) return consoleOutError("expected [ to begin");
         tk = tk.consume();
 
-        if (tk.type != "id") {
-            consoleOutError("expected first term to be a symbol / bare word")
-            return null;
-        }
+        if (tk.type != "id") return consoleOutError("expected first term to be a symbol / bare word");
+
         const name = tk.current;
         tk = tk.consume();
 
         if (tk.current == ",") tk = tk.consume();
-        else if (tk.current != "]") {
-            consoleOutError("expected , or ] after first term. Current=", tk.current);
-            return null;
-        }
+        else if (tk.current != "]") return consoleOutError("expected , or ] after first term. Current=", tk.current);
 
-        const parts = [];
-        let i = 0;
+        const parts: Part[] = [];
         while (tk.current != "]") {
-            if (tk.type == "eof") {
-                consoleOutError('unexpected EOF while running through terms until ]')
-                return null;
-            }
+            if (tk.type == "eof") return consoleOutError('unexpected EOF while running through terms until', ops.close);
 
             const part = Partlist.parse1(tk);
-            if (part == null) {
-                consoleOutError("part didn't parse at", tk.current, "\nremainder:", tk.remainder);
-                return null;
-            }
+            if (part == null) return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
 
             if (tk.current == ",") tk = tk.consume();
-            else if (tk.current != "]") return null;
+            else if (tk.current != "]") return consoleOutError("a term, a part, ended before the , or the ]   remaining: ", tk.remainder);
 
-            // Add the current Part onto the list...
-            parts[i++] = part;
+            parts.push(part);
         }
         tk = tk.consume();
 
@@ -541,10 +528,7 @@ class Partlist {
 
             while (true) {
                 const part = Partlist.parse1(tk);
-                if (part == null) {
-                    consoleOutError("subpart didn't parse:", tk.current);
-                    return null;
-                }
+                if (part == null) return consoleOutError("subpart didn't parse:", tk.current);
 
                 parts[i++] = part;
                 if (tk.current != ",") break;
@@ -555,19 +539,13 @@ class Partlist {
             let append: Part;
             if (tk.current == ops.sliceList) {
                 tk = tk.consume();
-                if (tk.type != "var") {
-                    consoleOutError(ops.sliceList, " wasn't followed by a var");
-                    return null;
-                }
+                if (tk.type != "var") return consoleOutError(ops.sliceList, " wasn't followed by a var");
                 append = new Variable(tk.current!);
                 tk = tk.consume();
             } else {
                 append = new Atom("nothing");
             }
-            if (tk.current != ops.closeList) {
-                consoleOutError("list destructure wasn't ended by }");
-                return null;
-            }
+            if (tk.current != ops.closeList) return consoleOutError("list destructure wasn't ended by }");
             tk = tk.consume();
             // Return the new cons.... of all this rubbish.
             for (--i; i >= 0; i--) append = new Term("cons", [parts[i], append]);
@@ -582,10 +560,7 @@ class Partlist {
 
         if (!openbracket) return new Atom(name!);
 
-        if (tk.current != ',') {
-            consoleOutError("expected , after symbol");
-            return null;
-        }
+        if (tk.current != ',') return consoleOutError("expected , after symbol");
         tk = tk.consume();
 
         const parts = [];
@@ -626,29 +601,31 @@ class Body {
 }
 
 class Rule {
-    head: Term;
+    head: Term | null;
     body: Body | null;
     asking: boolean;
 
     constructor(head: Term, bodylist: Term[] | null = null, isQuestion: boolean = false) {
-        this.head = head;
-        if (bodylist != null)
-            this.body = new Body(bodylist);
-        else
-            this.body = null;
-        this.asking = isQuestion;
+        if (isQuestion) {
+            this.head = null;
+            this.body = new Body(bodylist != null ? [head].concat(bodylist) : [head]);
+            this.asking = isQuestion;
+        }
+        else {
+            this.head = head;
+            this.body = (bodylist != null) ? new Body(bodylist) : null;
+            this.asking = isQuestion;
+        }
     }
 
     print() {
-        if (this.body == null) {
+        if (this.head != null)
             this.head.print();
-            print(ops.endSentence + "\n");
-        } else {
-            if (!this.asking) this.head.print();
-            print(" " + (this.asking ? ops.query : ops.if) + " ");
+        if (this.head && this.body)
+            print(" " + ops.if + " ");
+        if (this.body != null)
             this.body.print();
-            print(ops.endSentence + "\n");
-        }
+        print((this.asking ? ops.endQuestion : ops.endSentence) + "\n");
     }
 
     static parse(tk: Tokeniser): Rule | null {
@@ -662,15 +639,15 @@ class Rule {
             return new Rule(h);
         }
 
-        const isQuestion = tk.current == ops.query;
-        if (tk.current != ops.if && !isQuestion) return null;
-        tk = tk.consume();
-        const b = Rule.parseBody(tk);
+        const endQuestionNow = tk.current == ops.endQuestion;
+        const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator;
+        if (tk.current != ops.if && !isQuestion) return consoleOutError("expected one of", [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator].join(' '), " but found", tk.remainder);
 
-        if (tk.current != ops.endSentence && tk.current != ops.endQuestion && tk.current != ops.comment && !isQuestion) {
-            consoleOutError("expected", ops.endSentence, " but remaining:", tk.remainder)
-            return null;
-        }
+        tk = tk.consume();
+        const b = endQuestionNow ? null : Rule.parseBody(tk);
+
+        if (!endQuestionNow && tk.current != ops.endSentence && tk.current != ops.endQuestion)
+            return consoleOutError("expected one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
 
         return new Rule(h, b, isQuestion);
     }
@@ -733,7 +710,7 @@ class Tokeniser {
             return this;
         }
 
-        // punctuation   {  }  .  ,  [  ]  |  !  :- ?-
+        // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if  query ?-
         r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\bif\b|\?\-)(.*)$/);
         if (r) {
             this.remainder = r[2];
@@ -742,8 +719,8 @@ class Tokeniser {
             return this;
         }
 
-        // variable
-        r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*)(.*)$/);
+        // variable    including ? as varName
+        r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
@@ -1095,3 +1072,4 @@ function ExternalAndParse(thisTerm: Term, goalList: Term[], environment: Environ
 }
 
 freeform();
+commandLineEl.focus();

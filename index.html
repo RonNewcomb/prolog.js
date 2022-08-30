@@ -20,6 +20,7 @@
       }
       .errdiv {
         text-align: right;
+        /* border-top: 1px solid rgba(139, 0, 0, 0.5); */
       }
       .err {
         background-color: darkred;
@@ -106,7 +107,7 @@
 
 [arcsOut, X, L] if [bagof, O, [triple, P, X, O], L].
 
-?- [bagof, c, [triple, sc, A, B], L], [length, L, N]           # L should have 21 elements
+[bagof, c, [triple, sc, A, B], L],   [length, L, N]?           # L should have 21 elements
 
 </textarea
       >
