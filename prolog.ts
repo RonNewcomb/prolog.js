@@ -38,6 +38,7 @@ const enum ops {
   paramSeparator = ",",
   cutCommit = "commit",
   nothing = "nothing",
+  anything = "anything",
   notThis = "NOTTHIS",
   cons = "cons",
 }
@@ -145,9 +146,9 @@ function nextline(line: string): Database {
 
 // Print out an environment's contents.
 function printEnv(env?: { [key: string]: Part }) {
-  if (!env) return printAnswerline(ops.nothing + ".\n");
+  if (!env) return printAnswerline("Empty.\n");
   const retval: string[] = Object.entries(env).map(([name, part]) => ` ${name} = ${part.print()}\n`);
-  printAnswerline(retval.length ? retval.join("") : "Yess.\n");
+  printAnswerline(retval.length ? retval.join("") : "Empty.\n");
 }
 
 // Print bindings.
@@ -160,10 +161,11 @@ function printVars(variables: Variable[], environment: Environment): void {
       retval.push(variable.name);
       retval.push(" is ");
     }
-    retval.push(value(new Variable(variable.name + ".0"), environment).print());
+    const topLevelVarName = variable.name + ".0";
+    const part = value(new Variable(topLevelVarName), environment);
+    retval.push(part.name == topLevelVarName ? ops.anything : part.print());
     retval.push("\n");
   }
-  if (retval.length == 0) return printAnswerline("No.\n\n");
   retval.push("\n");
   printAnswerline(retval.join(""));
 }

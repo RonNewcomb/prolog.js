@@ -1,47 +1,164 @@
+This prolog is enhanced with the JavaScript callout capability though a rudimentary external/3 call; see the arithmetic functions for examples.
 
+ Show parse results
 Attaching builtins to database.
 Attachments done.
 Parsing rulesets.
+### Accumulated standard library lives under here!
+# unification and [ x, y, z; w ] support
 [unify, X, X].
-[conjunction, nil].
-[conjunction, {X | Rest}] :- [call, X], [conjunction, Rest].
-[disjunction, {X | Rest}] :- [call, X].
-[disjunction, {X | Rest}] :- [disjunction, Rest].
-[add, A, B, C] :- [external, "$1 + $2", {A, B}, C].
-[sub, A, B, C] :- [external, "$1 - $2", {A, B}, C].
-[mul, A, B, C] :- [external, "$1 * $2", {A, B}, C].
-[div, A, B, C] :- [external, "$1 / $2", {A, B}, C].
-[qsort, nil, nil].
-[qsort, {X | Rest}, Answer] :- [partition, X, Rest, nil, Before, nil, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer].
-[partition, X, nil, Before, Before, After, After].
-[partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] :- [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest].
-[partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] :- [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest].
-[leq, X, Y] :- [compare, X, Y, gt].
-[leq, X, Y] :- [compare, X, Y, eq].
-[gtr, X, Y] :- [compare, X, Y, lt].
-[append, nil, Z, Z].
-[append, {A | B}, Z, {A | ZZ}] :- [append, B, Z, ZZ].
-[reverse, nil, nil].
-[reverse, {A | B}, Z] :- [reverse, B, Brev], [append, Brev, {A}, Z].
-[length, nil, 0].
-[length, {H | T}, N] :- [length, T, M], [add, M, 1, N].
-[not, Term] :- [call, Term], [cut], [fail].
+[unify, X, X] .
+Memorized.
+# [ a, b, c ] --> [conjunction, {a, b, c}]
+[conjunction, {}].
+[conjunction, nothing] .
+Memorized.
+[conjunction, {X | Rest}] if [call, X], [conjunction, Rest].
+[conjunction, {X | Rest}] if [call, X], [conjunction, Rest] .
+Memorized.
+# [ a; b; c ] --> [disjunction, {a, b, c}]
+[disjunction, {X | Rest}] if [call, X].
+[disjunction, {X | Rest}] if [call, X] .
+Memorized.
+[disjunction, {X | Rest}] if [disjunction, Rest].
+[disjunction, {X | Rest}] if [disjunction, Rest] .
+Memorized.
+# Arithmetic
+[add, A, B, C] if [external, "$1 + $2", {A, B}, C]. # A + B = C, etc.
+[add, A, B, C] if [external, "$1 + $2", {A, B}, C] .
+Memorized.
+[sub, A, B, C] if [external, "$1 - $2", {A, B}, C].
+[sub, A, B, C] if [external, "$1 - $2", {A, B}, C] .
+Memorized.
+[mul, A, B, C] if [external, "$1 * $2", {A, B}, C].
+[mul, A, B, C] if [external, "$1 * $2", {A, B}, C] .
+Memorized.
+[div, A, B, C] if [external, "$1 / $2", {A, B}, C].
+[div, A, B, C] if [external, "$1 / $2", {A, B}, C] .
+Memorized.
+# The canonical quicksort
+[qsort, {}, {}].
+[qsort, nothing, nothing] .
+Memorized.
+[qsort, {X|Rest}, Answer] if [partition, X, Rest, {}, Before, {}, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer].
+[qsort, {X | Rest}, Answer] if [partition, X, Rest, nothing, Before, nothing, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer] .
+Memorized.
+[partition, X, {}, Before, Before, After, After].
+[partition, X, nothing, Before, Before, After, After] .
+Memorized.
+[partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] if [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest].
+[partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] if [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest] .
+Memorized.
+[partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] if [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest].
+[partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] if [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest] .
+Memorized.
+[leq, X, Y] if [compare, X, Y, gt].
+[leq, X, Y] if [compare, X, Y, gt] .
+Memorized.
+[leq, X, Y] if [compare, X, Y, eq].
+[leq, X, Y] if [compare, X, Y, eq] .
+Memorized.
+[gtr, X, Y] if [compare, X, Y, lt].
+[gtr, X, Y] if [compare, X, Y, lt] .
+Memorized.
+# Some list-processing stuff...
+[append, {}, Z, Z].
+[append, nothing, Z, Z] .
+Memorized.
+[append, {A|B}, Z, {A|ZZ}] if [append, B, Z, ZZ].
+[append, {A | B}, Z, {A | ZZ}] if [append, B, Z, ZZ] .
+Memorized.
+[reverse, {}, {}].
+[reverse, nothing, nothing] .
+Memorized.
+[reverse, {A|B}, Z] if [reverse, B, Brev], [append, Brev, {A}, Z].
+[reverse, {A | B}, Z] if [reverse, B, Brev], [append, Brev, {A}, Z] .
+Memorized.
+[length, {}, 0].
+[length, nothing, 0] .
+Memorized.
+[length, {H|T}, N] if [length, T, M], [add, M, 1, N].
+[length, {H | T}, N] if [length, T, M], [add, M, 1, N] .
+Memorized.
+# Standard prolog not/1
+[not, Term] if [call, Term], commit, [fail].
+[not, Term] if [call, Term], [commit], [fail] .
+Memorized.
 [not, Term].
-[var, X] :- [bagof, l, [varTest, X], {l, l}].
+[not, Term] .
+Memorized.
+# Standard prolog var/1
+[var, X] if [bagof, l, [varTest, X], {l, l}].
+[var, X] if [bagof, l, [varTest, X], {l, l}] .
+Memorized.
 [varTest, a].
+[varTest, a] .
+Memorized.
 [tarTest, b].
+[tarTest, b] .
+Memorized.
+#
+#
+# Enter your ruleset in here.
 [triple, sc, a, b].
+[triple, sc, a, b] .
+Memorized.
 [triple, sc, b, c].
+[triple, sc, b, c] .
+Memorized.
 [triple, sc, c, d].
+[triple, sc, c, d] .
+Memorized.
 [triple, sc, d, e].
+[triple, sc, d, e] .
+Memorized.
 [triple, sc, e, f].
+[triple, sc, e, f] .
+Memorized.
 [triple, sc, f, g].
+[triple, sc, f, g] .
+Memorized.
 [triple, type, sc, transitive].
-[triple, P, X, Y] :- [triple, type, P, transitive], [triple, P, X, Z], [triple, P, Z, Y].
-[arcsOut, X, L] :- [bagof, O, [triple, P, X, O], L].
- ?- [bagof, c, [triple, sc, A, B], L], [length, L, N].
-A = A.0
-B = B.0
-L = {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}
-N = 21
-
+[triple, type, sc, transitive] .
+Memorized.
+[triple, P, X, Y] if NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
+[triple, P, X, Y] if [triple, type, P, transitive], [triple, P, X, Z], [triple, P, Z, Y] .
+Memorized.
+[arcsOut, X, L] if [bagof, O, [triple, P, X, O], L].
+[arcsOut, X, L] if [bagof, O, [triple, P, X, O], L] .
+Memorized.
+[bagof, c, [triple, sc, A, B], L], [length, L, N]? # L should have 21 elements
+[bagof, c, [triple, sc, A, B], L], [length, L, N] ?
+A is anything
+B is anything
+L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}
+N is 21
+[holds, "bucket", 834, yes].
+[holds, "bucket", 834, yes] .
+Memorized.
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[holds, "bucket", ?, yes]
+[holds, "bucket", ?, yes] ?
+834
+[holds, "box", 411, no].
+[holds, "box", 411, no] .
+Memorized.
+[holds, "envelope", 1, yes].
+[holds, "envelope", 1, yes] .
+Memorized.
+[holds, Container, Capacity, Whether]?
+[holds, Container, Capacity, Whether] ?
+Container is "bucket"
+Capacity is 834
+Whether is yes
+Container is "box"
+Capacity is 411
+Whether is no
+Container is "envelope"
+Capacity is 1
+Whether is yes
