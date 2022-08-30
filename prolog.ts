@@ -50,8 +50,23 @@ function print(str: string | number) {
 
 function printUserline(str: string) {
     const div = newConsoleLine();
-    //div.classList.add('userdiv');
+    div.classList.add('userdiv');
     div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
+}
+
+function printEcholine(str: string) {
+    if (!document.input.showparse.checked) return;
+    const div = newConsoleLine();
+    div.classList.add('echodiv');
+    div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
+}
+
+function printAnswerline(str: string) {
+    const div = newConsoleLine();
+    div.classList.add('answerdiv');
+    div.innerHTML = '<div><div>' + str.replaceAll('\n', '</div><div>') + '</div></div>';
     newConsoleLine();
 }
 
@@ -114,7 +129,7 @@ function nextline(line: string, el?: HTMLInputElement): Database {
     const or = Rule.parse(new Tokeniser(line));
     if (or == null) return database;
     database.push(or);
-    if (document.input.showparse.checked) or.print()
+    printEcholine(or.print());
     if (or.asking && or.body) {
         const vs = varNames(or.body.list);
         answerQuestion(renameVariables(or.body.list, 0, []) as Term[], {} as Environment, database, 1, applyOne(printVars, vs));
@@ -131,36 +146,40 @@ function applyOne(f: Function, arg1: any) {
 // Some auxiliary bits and pieces... environment-related.
 
 // Print out an environment's contents.
-function printEnv(env: { [key: string]: { print: () => void } } | null) {
+function printEnv(env: { [key: string]: { print: () => string } } | null) {
     if (env == null) {
-        print("null\n");
+        printAnswerline("Nothing.\n");
         return;
     }
+    let retval: string[] = [];
     let k = false;
     for (const i in env) {
         k = true;
-        print(" " + i + " = ");
-        env[i].print();
-        print("\n");
+        retval.push(" " + i + " = ");
+        retval.push(env[i].print());
+        retval.push("\n");
     }
-    if (!k) print("Yes.\n");
+    if (!k) retval.push("Yes.\n");
+    printAnswerline(retval.join(''));
 }
 
 function printVars(which: Variable[], environment: Environment) {
     // Print bindings.
+    let retval: string[] = [];
     if (which.length == 0) {
-        print("Yes.\n");
+        retval.push("Yes.\n");
     } else {
         for (var i = 0; i < which.length; i++) {
             if (which[i].name != ops.impliedQuestionVar) {
-                print(which[i].name);
-                print(" is ");
+                retval.push(which[i].name);
+                retval.push(" is ");
             }
-            (value(new Variable(which[i].name + ".0"), environment)).print();
-            print("\n");
+            retval.push((value(new Variable(which[i].name + ".0"), environment)).print());
+            retval.push("\n");
         }
     }
-    print("\n");
+    retval.push("\n");
+    printAnswerline(retval.join(''));
 }
 
 interface Environment { [key: string]: Part }
@@ -379,24 +398,24 @@ type Part = Variable | Atom | Term;
 
 class Variable {
     name: string;
-    print: () => void;
+    print: () => string;
     type: 'Variable';
 
     constructor(head: string) {
         this.name = head;
-        this.print = function () { print(this.name); };
+        this.print = function () { return (this.name); };
         this.type = "Variable";
     }
 }
 
 class Atom {
     name: string;
-    print: () => void;
+    print: () => string;
     type: 'Atom';
 
     constructor(head: string) {
         this.name = head;
-        this.print = function () { print(this.name); };
+        this.print = function () { return (this.name); };
         this.type = "Atom";
     }
 }
@@ -417,7 +436,8 @@ class Term {
         this.parent = this;
     }
 
-    print() {
+    print(): string {
+        const retval: string[] = [];
         if (this.name == "cons") {
             let part: Part = this;
             while (part.type == "Term" && part.name == "cons" && (part as Term).partlist.list.length == 2) {
@@ -425,25 +445,26 @@ class Term {
             }
             if ((part.type == "Atom" && part.name == "nothing") || part.type == "Variable") {
                 part = this;
-                print(ops.openList);
+                retval.push(ops.openList);
                 let com = false;
                 while (part.type == "Term" && part.name == "cons" && (part as Term).partlist.list.length == 2) {
-                    if (com) print(", ");
-                    (part as Term).partlist.list[0].print();
+                    if (com) retval.push(", ");
+                    retval.push((part as Term).partlist.list[0].print());
                     com = true;
                     part = (part as Term).partlist.list[1];
                 }
                 if (part.type == "Variable") {
-                    print(" " + ops.sliceList + " ");
-                    part.print();
+                    retval.push(" " + ops.sliceList + " ");
+                    retval.push(part.print());
                 }
-                print(ops.closeList);
-                return;
+                retval.push(ops.closeList);
+                return retval.join('');
             }
         }
-        print(ops.open + this.name);
-        this.partlist.print();
-        print(ops.close);
+        retval.push(ops.open + this.name);
+        retval.push(this.partlist.print());
+        retval.push(ops.close);
+        return retval.join('');
     };
 
     static parse(tk: Tokeniser): Term | null {
@@ -500,11 +521,13 @@ class Partlist {
         this.list = list;
     }
 
-    print() {
+    print(): string {
+        const retval: string[] = [];
         for (let i = 0; i < this.list.length; i++) {
-            print(", ");
-            this.list[i].print();
+            retval.push(", ");
+            retval.push(this.list[i].print());
         }
+        return retval.join('');
     };
 
     // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
@@ -598,12 +621,14 @@ class Body {
         this.list = list;
     }
 
-    print() {
+    print(): string {
+        const retval: string[] = [];
         for (var i = 0; i < this.list.length; i++) {
-            this.list[i].print();
+            retval.push(this.list[i].print());
             if (i < this.list.length - 1)
-                print(", ");
+                retval.push(", ");
         }
+        return retval.join(' ');
     }
 }
 
@@ -625,14 +650,16 @@ class Rule {
         }
     }
 
-    print() {
+    print(): string {
+        const retval: string[] = [];
         if (this.head != null)
-            this.head.print();
+            retval.push(this.head.print());
         if (this.head && this.body)
-            print(" " + ops.if + " ");
+            retval.push((" " + ops.if + " "));
         if (this.body != null)
-            this.body.print();
-        print((this.asking ? ops.endQuestion : ops.endSentence) + "\n");
+            retval.push(this.body.print());
+        retval.push(((this.asking ? ops.endQuestion : ops.endSentence) + "\n"));
+        return retval.join(' ');
     }
 
     static parse(tk: Tokeniser): Rule | null {

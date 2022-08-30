@@ -23,8 +23,22 @@ function print(str) {
 }
 function printUserline(str) {
     const div = newConsoleLine();
-    //div.classList.add('userdiv');
+    div.classList.add('userdiv');
     div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
+}
+function printEcholine(str) {
+    if (!document.input.showparse.checked)
+        return;
+    const div = newConsoleLine();
+    div.classList.add('echodiv');
+    div.innerHTML = '<span>' + str + '</span>';
+    newConsoleLine();
+}
+function printAnswerline(str) {
+    const div = newConsoleLine();
+    div.classList.add('answerdiv');
+    div.innerHTML = '<div><div>' + str.replaceAll('\n', '</div><div>') + '</div></div>';
     newConsoleLine();
 }
 function consoleOutError(...rest) {
@@ -46,7 +60,7 @@ function freeform() {
     print("\nAttaching builtins to database.\n");
     database.builtin = {};
     database.builtin["compare/3"] = Comparitor;
-    database.builtin["commit" /* cutCommit */ + "/0"] = Commit;
+    database.builtin["commit" /* ops.cutCommit */ + "/0"] = Commit;
     database.builtin["call/1"] = Call;
     database.builtin["fail/0"] = Fail;
     database.builtin["bagof/3"] = BagOf;
@@ -72,15 +86,14 @@ function nextline(line, el) {
     if (el)
         el.value = '';
     previousInput = line;
-    if (line.substring(0, 1) == "#" /* comment */ || line == "" || line.match(/^\s*$/)) {
+    if (line.substring(0, 1) == "#" /* ops.comment */ || line == "" || line.match(/^\s*$/)) {
         return database;
     }
     const or = Rule.parse(new Tokeniser(line));
     if (or == null)
         return database;
     database.push(or);
-    if (document.input.showparse.checked)
-        or.print();
+    printEcholine(or.print());
     if (or.asking && or.body) {
         const vs = varNames(or.body.list);
         answerQuestion(renameVariables(or.body.list, 0, []), {}, database, 1, applyOne(printVars, vs));
@@ -97,35 +110,39 @@ function applyOne(f, arg1) {
 // Print out an environment's contents.
 function printEnv(env) {
     if (env == null) {
-        print("null\n");
+        printAnswerline("Nothing.\n");
         return;
     }
+    let retval = [];
     let k = false;
     for (const i in env) {
         k = true;
-        print(" " + i + " = ");
-        env[i].print();
-        print("\n");
+        retval.push(" " + i + " = ");
+        retval.push(env[i].print());
+        retval.push("\n");
     }
     if (!k)
-        print("Yes.\n");
+        retval.push("Yes.\n");
+    printAnswerline(retval.join(''));
 }
 function printVars(which, environment) {
     // Print bindings.
+    let retval = [];
     if (which.length == 0) {
-        print("Yes.\n");
+        retval.push("Yes.\n");
     }
     else {
         for (var i = 0; i < which.length; i++) {
-            if (which[i].name != "?" /* impliedQuestionVar */) {
-                print(which[i].name);
-                print(" is ");
+            if (which[i].name != "?" /* ops.impliedQuestionVar */) {
+                retval.push(which[i].name);
+                retval.push(" is ");
             }
-            (value(new Variable(which[i].name + ".0"), environment)).print();
-            print("\n");
+            retval.push((value(new Variable(which[i].name + ".0"), environment)).print());
+            retval.push("\n");
         }
     }
-    print("\n");
+    retval.push("\n");
+    printAnswerline(retval.join(''));
 }
 // The value of x in a given environment
 function value(x, env) {
@@ -328,14 +345,14 @@ function answerQuestion(goalList, environment, db, level, reportFunction) {
 class Variable {
     constructor(head) {
         this.name = head;
-        this.print = function () { print(this.name); };
+        this.print = function () { return (this.name); };
         this.type = "Variable";
     }
 }
 class Atom {
     constructor(head) {
         this.name = head;
-        this.print = function () { print(this.name); };
+        this.print = function () { return (this.name); };
         this.type = "Atom";
     }
 }
@@ -347,6 +364,7 @@ class Term {
         this.parent = this;
     }
     print() {
+        const retval = [];
         if (this.name == "cons") {
             let part = this;
             while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
@@ -354,41 +372,42 @@ class Term {
             }
             if ((part.type == "Atom" && part.name == "nothing") || part.type == "Variable") {
                 part = this;
-                print("{" /* openList */);
+                retval.push("{" /* ops.openList */);
                 let com = false;
                 while (part.type == "Term" && part.name == "cons" && part.partlist.list.length == 2) {
                     if (com)
-                        print(", ");
-                    part.partlist.list[0].print();
+                        retval.push(", ");
+                    retval.push(part.partlist.list[0].print());
                     com = true;
                     part = part.partlist.list[1];
                 }
                 if (part.type == "Variable") {
-                    print(" " + "|" /* sliceList */ + " ");
-                    part.print();
+                    retval.push(" " + "|" /* ops.sliceList */ + " ");
+                    retval.push(part.print());
                 }
-                print("}" /* closeList */);
-                return;
+                retval.push("}" /* ops.closeList */);
+                return retval.join('');
             }
         }
-        print("[" /* open */ + this.name);
-        this.partlist.print();
-        print("]" /* close */);
+        retval.push("[" /* ops.open */ + this.name);
+        retval.push(this.partlist.print());
+        retval.push("]" /* ops.close */);
+        return retval.join('');
     }
     ;
     static parse(tk) {
         // Term -> [NOTTHIS] id ( optParamList )
-        if ( /*tk.type == "id" && */tk.current == "commit" /* cutCommit */) {
+        if ( /*tk.type == "id" && */tk.current == "commit" /* ops.cutCommit */) {
             // Parse bareword commit as commit/0
             tk = tk.consume();
-            return new Term("commit" /* cutCommit */, []);
+            return new Term("commit" /* ops.cutCommit */, []);
         }
         let notthis = false;
         if (tk.current == "NOTTHIS") {
             notthis = true;
             tk = tk.consume();
         }
-        if (tk.type != "punc" || tk.current != "[" /* open */)
+        if (tk.type != "punc" || tk.current != "[" /* ops.open */)
             return consoleOutError("expected [ to begin");
         tk = tk.consume();
         if (tk.type != "id")
@@ -402,7 +421,7 @@ class Term {
         const parts = [];
         while (tk.current != "]") {
             if (tk.type == "eof")
-                return consoleOutError('unexpected EOF while running through terms until', "]" /* close */);
+                return consoleOutError('unexpected EOF while running through terms until', "]" /* ops.close */);
             const part = Partlist.parse1(tk);
             if (part == null)
                 return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
@@ -424,10 +443,12 @@ class Partlist {
         this.list = list;
     }
     print() {
+        const retval = [];
         for (let i = 0; i < this.list.length; i++) {
-            print(", ");
-            this.list[i].print();
+            retval.push(", ");
+            retval.push(this.list[i].print());
         }
+        return retval.join('');
     }
     ;
     // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
@@ -439,11 +460,11 @@ class Partlist {
             tk = tk.consume();
             return new Variable(varName);
         }
-        if (tk.type == "punc" && tk.current == "{" /* openList */) {
+        if (tk.type == "punc" && tk.current == "{" /* ops.openList */) {
             tk = tk.consume();
             // destructure a list
             // Special case: {} = new atom(nothing).
-            if (tk.type == "punc" && tk.current == "}" /* closeList */) {
+            if (tk.type == "punc" && tk.current == "}" /* ops.closeList */) {
                 tk = tk.consume();
                 return new Atom("nothing");
             }
@@ -461,17 +482,17 @@ class Partlist {
             }
             // Find the end of the list ... "| Var }" or "}".
             let append;
-            if (tk.current == "|" /* sliceList */) {
+            if (tk.current == "|" /* ops.sliceList */) {
                 tk = tk.consume();
                 if (tk.type != "var")
-                    return consoleOutError("|" /* sliceList */, " wasn't followed by a var");
+                    return consoleOutError("|" /* ops.sliceList */, " wasn't followed by a var");
                 append = new Variable(tk.current);
                 tk = tk.consume();
             }
             else {
                 append = new Atom("nothing");
             }
-            if (tk.current != "}" /* closeList */)
+            if (tk.current != "}" /* ops.closeList */)
                 return consoleOutError("list destructure wasn't ended by }");
             tk = tk.consume();
             // Return the new cons.... of all this rubbish.
@@ -479,7 +500,7 @@ class Partlist {
                 append = new Term("cons", [parts[i], append]);
             return append;
         }
-        const openbracket = (tk.type == 'punc' && tk.current == "[" /* open */);
+        const openbracket = (tk.type == 'punc' && tk.current == "[" /* ops.open */);
         if (openbracket)
             tk = tk.consume();
         const name = tk.current;
@@ -491,7 +512,7 @@ class Partlist {
         tk = tk.consume();
         const parts = [];
         let i = 0;
-        while (tk.current != "]" /* close */) {
+        while (tk.current != "]" /* ops.close */) {
             if (tk.type == "eof")
                 return null;
             const part = Partlist.parse1(tk);
@@ -499,7 +520,7 @@ class Partlist {
                 return null;
             if (tk.current == ",")
                 tk = tk.consume();
-            else if (tk.current != "]" /* close */)
+            else if (tk.current != "]" /* ops.close */)
                 return null;
             // Add the current Part onto the list...
             parts[i++] = part;
@@ -513,11 +534,13 @@ class Body {
         this.list = list;
     }
     print() {
+        const retval = [];
         for (var i = 0; i < this.list.length; i++) {
-            this.list[i].print();
+            retval.push(this.list[i].print());
             if (i < this.list.length - 1)
-                print(", ");
+                retval.push(", ");
         }
+        return retval.join(' ');
     }
 }
 class Rule {
@@ -534,32 +557,34 @@ class Rule {
         }
     }
     print() {
+        const retval = [];
         if (this.head != null)
-            this.head.print();
+            retval.push(this.head.print());
         if (this.head && this.body)
-            print(" " + "if" /* if */ + " ");
+            retval.push((" " + "if" /* ops.if */ + " "));
         if (this.body != null)
-            this.body.print();
-        print((this.asking ? "?" /* endQuestion */ : "." /* endSentence */) + "\n");
+            retval.push(this.body.print());
+        retval.push(((this.asking ? "?" /* ops.endQuestion */ : "." /* ops.endSentence */) + "\n"));
+        return retval.join(' ');
     }
     static parse(tk) {
         // A rule is a Head followed by . or by :- Body
         const head = Rule.parseHead(tk);
         if (!head)
             return consoleOutError("syntax error");
-        if (tk.current == "." /* endSentence */)
+        if (tk.current == "." /* ops.endSentence */)
             return new Rule(head);
         const questionIsImplied = hasTheImpliedQuestionVar(head);
-        const endQuestionNow = tk.current == "?" /* endQuestion */;
-        const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
-        if (tk.current != "if" /* if */ && !isQuestion)
-            return consoleOutError("expected one of", ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */].join(' '), " but found", tk.remainder);
+        const endQuestionNow = tk.current == "?" /* ops.endQuestion */;
+        const isQuestion = tk.current == "?" /* ops.endQuestion */ || tk.current == "," /* ops.bodyTermSeparator */ || questionIsImplied;
+        if (tk.current != "if" /* ops.if */ && !isQuestion)
+            return consoleOutError("expected one of", ["if" /* ops.if */, "?" /* ops.endQuestion */, "." /* ops.endSentence */, "," /* ops.bodyTermSeparator */].join(' '), " but found", tk.remainder);
         if (tk.type == 'eof')
             return new Rule(head, null, isQuestion);
         tk = tk.consume();
         const body = endQuestionNow ? null : Rule.parseBody(tk);
-        if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
-            return consoleOutError("expected one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
+        if (!endQuestionNow && tk.current != "." /* ops.endSentence */ && tk.current != "?" /* ops.endQuestion */ && !questionIsImplied)
+            return consoleOutError("expected one of", "." /* ops.endSentence */, "?" /* ops.endQuestion */, " but remaining:", tk.remainder);
         return new Rule(head, body, isQuestion);
     }
     static parseHead(tk) {
@@ -585,7 +610,7 @@ class Rule {
 function hasTheImpliedQuestionVar(term) {
     switch (term.type) {
         case 'Atom': return false;
-        case 'Variable': return term.name === "?" /* impliedQuestionVar */;
+        case 'Variable': return term.name === "?" /* ops.impliedQuestionVar */;
         case 'Term': return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
     }
 }
