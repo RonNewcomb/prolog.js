@@ -4,15 +4,20 @@
 
     <style>
       body {
-        background-color: #555555;
+        background-color: #222222;
         color: white;
       }
+      .toolbar {
+        position: sticky;
+        top: 0;
+        background-color: rgba(22,22,22,.88);
+      }
       textarea {
-        background-color: #555555;
+        background-color: #222222;
         color: white;
       }
       input[type="text"] {
-        background-color: #555555;
+        background-color: #222222;
         color: white;
       }
       #consoleout {
@@ -42,10 +47,19 @@
       .echodiv {
         text-align: left;
         margin: 8px;
-        background-color: lightgray;
+        border: 1px dashed lightgray;
         padding: 4px 1em;
         border-radius: 8px;
         width: fit-content;
+      }
+      .userdiv{
+        text-align: left;
+        margin: 8px;
+        background-color: darkslateblue;
+        padding: 4px 1em;
+        border-radius: 8px;
+        width: fit-content;
+
       }
     </style>
   </head>
@@ -131,6 +145,7 @@
 
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes]?
+[holds, "bucket", 76, yes]?
 [holds, "bucket", ?, yes]
 [holds, "box", 411, no].
 [holds, "envelope", 1, yes].
@@ -139,8 +154,7 @@
 </textarea
       >
     </form>
-    <form name="input" action="javascript:freeform();">
-      <input type="submit" value="Run query" />
+    <form name="input" action="javascript:return false;" class="toolbar">
       <input type="checkbox" name="showparse" checked /> Show parse results
     </form>
     <div id="consoleout">
