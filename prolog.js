@@ -22,6 +22,11 @@ function printEcholine(str) {
     div.classList.add("echodiv");
     div.innerHTML = "<span>" + str + "</span>";
 }
+function printDebugline(str) {
+    const div = newConsoleLine();
+    div.classList.add("debugdiv");
+    div.innerHTML = "<div>" + str.replaceAll("\n", "</div><div>") + "</div>";
+}
 function printAnswerline(str) {
     const div = newConsoleLine();
     div.classList.add("answerdiv");

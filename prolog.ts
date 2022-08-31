@@ -69,6 +69,12 @@ function printEcholine(str: string) {
   div.innerHTML = "<span>" + str + "</span>";
 }
 
+function printDebugline(str: string) {
+  const div = newConsoleLine();
+  div.classList.add("debugdiv");
+  div.innerHTML = "<div>" + str.replaceAll("\n", "</div><div>") + "</div>";
+}
+
 function printAnswerline(str: string) {
   const div = newConsoleLine();
   div.classList.add("answerdiv");
