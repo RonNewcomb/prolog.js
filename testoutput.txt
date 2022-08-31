@@ -7,89 +7,89 @@ Parsing rulesets.
 ### Accumulated standard library lives under here!
 # unification and [ x, y, z; w ] support
 [unify, X, X].
-[unify, X, X] .
+[unify, The X, The X] .
 Memorized.
 # [ a, b, c ] --> [conjunction, {a, b, c}]
 [conjunction, {}].
 [conjunction, nothing] .
 Memorized.
 [conjunction, {X | Rest}] if [call, X], [conjunction, Rest].
-[conjunction, {X | Rest}] if [call, X], [conjunction, Rest] .
+[conjunction, {The X | The Rest}] if [call, The X], [conjunction, The Rest] .
 Memorized.
 # [ a; b; c ] --> [disjunction, {a, b, c}]
 [disjunction, {X | Rest}] if [call, X].
-[disjunction, {X | Rest}] if [call, X] .
+[disjunction, {The X | The Rest}] if [call, The X] .
 Memorized.
 [disjunction, {X | Rest}] if [disjunction, Rest].
-[disjunction, {X | Rest}] if [disjunction, Rest] .
+[disjunction, {The X | The Rest}] if [disjunction, The Rest] .
 Memorized.
 # Arithmetic
 [add, A, B, C] if [external, "$1 + $2", {A, B}, C]. # A + B = C, etc.
-[add, A, B, C] if [external, "$1 + $2", {A, B}, C] .
+[add, The A, The B, The C] if [external, "$1 + $2", {The A, The B}, The C] .
 Memorized.
 [sub, A, B, C] if [external, "$1 - $2", {A, B}, C].
-[sub, A, B, C] if [external, "$1 - $2", {A, B}, C] .
+[sub, The A, The B, The C] if [external, "$1 - $2", {The A, The B}, The C] .
 Memorized.
 [mul, A, B, C] if [external, "$1 * $2", {A, B}, C].
-[mul, A, B, C] if [external, "$1 * $2", {A, B}, C] .
+[mul, The A, The B, The C] if [external, "$1 * $2", {The A, The B}, The C] .
 Memorized.
 [div, A, B, C] if [external, "$1 / $2", {A, B}, C].
-[div, A, B, C] if [external, "$1 / $2", {A, B}, C] .
+[div, The A, The B, The C] if [external, "$1 / $2", {The A, The B}, The C] .
 Memorized.
 # The canonical quicksort
 [qsort, {}, {}].
 [qsort, nothing, nothing] .
 Memorized.
 [qsort, {X|Rest}, Answer] if [partition, X, Rest, {}, Before, {}, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer].
-[qsort, {X | Rest}, Answer] if [partition, X, Rest, nothing, Before, nothing, After], [qsort, Before, Bsort], [qsort, After, Asort], [append, Bsort, {X | Asort}, Answer] .
+[qsort, {The X | The Rest}, The Answer] if [partition, The X, The Rest, nothing, The Before, nothing, The After], [qsort, The Before, The Bsort], [qsort, The After, The Asort], [append, The Bsort, {The X | The Asort}, The Answer] .
 Memorized.
 [partition, X, {}, Before, Before, After, After].
-[partition, X, nothing, Before, Before, After, After] .
+[partition, The X, nothing, The Before, The Before, The After, The After] .
 Memorized.
 [partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] if [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest].
-[partition, X, {Y | Rest}, B, {Y | Brest}, A, Arest] if [leq, X, Y], [partition, X, Rest, B, Brest, A, Arest] .
+[partition, The X, {The Y | The Rest}, The B, {The Y | The Brest}, The A, The Arest] if [leq, The X, The Y], [partition, The X, The Rest, The B, The Brest, The A, The Arest] .
 Memorized.
 [partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] if [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest].
-[partition, X, {Y | Rest}, B, Brest, A, {Y | Arest}] if [gtr, X, Y], [partition, X, Rest, B, Brest, A, Arest] .
+[partition, The X, {The Y | The Rest}, The B, The Brest, The A, {The Y | The Arest}] if [gtr, The X, The Y], [partition, The X, The Rest, The B, The Brest, The A, The Arest] .
 Memorized.
 [leq, X, Y] if [compare, X, Y, gt].
-[leq, X, Y] if [compare, X, Y, gt] .
+[leq, The X, The Y] if [compare, The X, The Y, gt] .
 Memorized.
 [leq, X, Y] if [compare, X, Y, eq].
-[leq, X, Y] if [compare, X, Y, eq] .
+[leq, The X, The Y] if [compare, The X, The Y, eq] .
 Memorized.
 [gtr, X, Y] if [compare, X, Y, lt].
-[gtr, X, Y] if [compare, X, Y, lt] .
+[gtr, The X, The Y] if [compare, The X, The Y, lt] .
 Memorized.
 # Some list-processing stuff...
 [append, {}, Z, Z].
-[append, nothing, Z, Z] .
+[append, nothing, The Z, The Z] .
 Memorized.
 [append, {A|B}, Z, {A|ZZ}] if [append, B, Z, ZZ].
-[append, {A | B}, Z, {A | ZZ}] if [append, B, Z, ZZ] .
+[append, {The A | The B}, The Z, {The A | The ZZ}] if [append, The B, The Z, The ZZ] .
 Memorized.
 [reverse, {}, {}].
 [reverse, nothing, nothing] .
 Memorized.
 [reverse, {A|B}, Z] if [reverse, B, Brev], [append, Brev, {A}, Z].
-[reverse, {A | B}, Z] if [reverse, B, Brev], [append, Brev, {A}, Z] .
+[reverse, {The A | The B}, The Z] if [reverse, The B, The Brev], [append, The Brev, {The A}, The Z] .
 Memorized.
 [length, {}, 0].
 [length, nothing, 0] .
 Memorized.
 [length, {H|T}, N] if [length, T, M], [add, M, 1, N].
-[length, {H | T}, N] if [length, T, M], [add, M, 1, N] .
+[length, {The H | The T}, The N] if [length, The T, The M], [add, The M, 1, The N] .
 Memorized.
 # Standard prolog not/1
 [not, Term] if [call, Term], commit, [fail].
-[not, Term] if [call, Term], [commit], [fail] .
+[not, The Term] if [call, The Term], [commit], [fail] .
 Memorized.
 [not, Term].
-[not, Term] .
+[not, The Term] .
 Memorized.
 # Standard prolog var/1
 [var, X] if [bagof, l, [varTest, X], {l, l}].
-[var, X] if [bagof, l, [varTest, X], {l, l}] .
+[var, The X] if [bagof, l, [varTest, The X], {l, l}] .
 Memorized.
 [varTest, a].
 [varTest, a] .
@@ -122,17 +122,17 @@ Memorized.
 [triple, type, sc, transitive] .
 Memorized.
 [triple, P, X, Y] if NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
-[triple, P, X, Y] if [triple, type, P, transitive], [triple, P, X, Z], [triple, P, Z, Y] .
+[triple, The P, The X, The Y] if [triple, type, The P, transitive], [triple, The P, The X, The Z], [triple, The P, The Z, The Y] .
 Memorized.
 [arcsOut, X, L] if [bagof, O, [triple, P, X, O], L].
-[arcsOut, X, L] if [bagof, O, [triple, P, X, O], L] .
+[arcsOut, The X, The L] if [bagof, The O, [triple, The P, The X, The O], The L] .
 Memorized.
 [bagof, c, [triple, sc, A, B], L], [length, L, N]? # L should have 21 elements
-[bagof, c, [triple, sc, A, B], L], [length, L, N] ?
-A is anything
-B is anything
-L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}
-N is 21
+[bagof, c, [triple, sc, The A, The B], The L], [length, The L, The N] ?
+The A is anything.
+The B is anything.
+The L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
+The N is 21.
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .
 Memorized.
@@ -143,8 +143,8 @@ Yes.
 [holds, "bucket", 76, yes] ?
 No.
 [holds, "bucket", ?, yes]
-[holds, "bucket", ?, yes] ?
-834
+[holds, "bucket", The ?, yes] ?
+834.
 [holds, "box", 411, no].
 [holds, "box", 411, no] .
 Memorized.
@@ -152,13 +152,13 @@ Memorized.
 [holds, "envelope", 1, yes] .
 Memorized.
 [holds, Container, Capacity, Whether]?
-[holds, Container, Capacity, Whether] ?
-Container is "bucket"
-Capacity is 834
-Whether is yes
-Container is "box"
-Capacity is 411
-Whether is no
-Container is "envelope"
-Capacity is 1
-Whether is yes
+[holds, The Container, The Capacity, The Whether] ?
+The Container is "bucket".
+The Capacity is 834.
+The Whether is yes.
+The Container is "box".
+The Capacity is 411.
+The Whether is no.
+The Container is "envelope".
+The Capacity is 1.
+The Whether is yes.

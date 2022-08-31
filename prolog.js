@@ -107,13 +107,14 @@ function printVars(variables, environment) {
     const retval = [];
     for (const variable of variables) {
         if (variable.name != "?" /* impliedQuestionVar */) {
+            retval.push("The ");
             retval.push(variable.name);
             retval.push(" is ");
         }
         const topLevelVarName = variable.name + ".0";
         const part = value(new Variable(topLevelVarName), environment);
         retval.push(part.name == topLevelVarName ? "anything" /* anything */ : part.print());
-        retval.push("\n");
+        retval.push(".\n");
     }
     retval.push("\n");
     printAnswerline(retval.join(""));
@@ -297,7 +298,7 @@ class Variable {
         this.name = head;
     }
     print() {
-        return this.name;
+        return "The " + this.name;
     }
 }
 class Atom {
@@ -391,11 +392,11 @@ class Partlist {
             const part = Partlist.parse1(tk);
             if (part == null)
                 return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
+            parts.push(part);
             if (tk.current == ",")
                 tk = tk.consume();
             else if (tk.current != "]" /* close */)
                 return consoleOutError("a term, a part, ended before the , or the ]   remaining: ", tk.remainder);
-            parts.push(part);
         }
         tk = tk.consume();
         return parts;
@@ -617,6 +618,8 @@ class Tokeniser {
             this.type = "id";
             return this;
         }
+        if (this.remainder)
+            consoleOutError("Tokenizer doesn't recognize ", this.remainder);
         // eof?
         this.current = "";
         this.type = "eof";
