@@ -508,21 +508,37 @@ class Rule {
         const head = Rule.parseHead(tk);
         if (!head)
             return consoleOutError("syntax error");
-        if (tk.current == "." /* endSentence */)
-            return new Rule(head);
         const expected = ["if" /* if */, "?" /* endQuestion */, "." /* endSentence */, "," /* bodyTermSeparator */];
-        const questionIsImplied = hasTheImpliedQuestionVar(head);
-        if (!expected.includes(tk.current) && !questionIsImplied && tk.type != "eof")
-            return consoleOutError("expected one of", expected.join(" "), " but found", tk.remainder);
-        const endQuestionNow = tk.current == "?" /* endQuestion */;
+        const questionIsImplied = hasTheImpliedUnboundVar(head);
         const isQuestion = tk.current == "?" /* endQuestion */ || tk.current == "," /* bodyTermSeparator */ || questionIsImplied;
+        if (!expected.includes(tk.current) && !questionIsImplied && tk.type != "eof")
+            return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
         if (tk.type == "eof")
             return new Rule(head, null, isQuestion);
-        tk = tk.consume();
-        const body = endQuestionNow ? null : Rule.parseBody(tk);
-        if (!endQuestionNow && tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
-            return consoleOutError("expected end of sentence with one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
-        return new Rule(head, body, isQuestion);
+        switch (tk.current) {
+            case "." /* endSentence */:
+                tk = tk.consume();
+                return new Rule(head, null, questionIsImplied); // [foo, ?].  same as  [foo, ?]?
+            case "?" /* endQuestion */:
+                tk = tk.consume();
+                return new Rule(head, null, true);
+            case "if" /* if */:
+                tk = tk.consume();
+                const bodyOfIf = Rule.parseBody(tk);
+                if (tk.current == "." /* endSentence */)
+                    tk = tk.consume();
+                else if (tk.type != "eof")
+                    return consoleOutError("expected end of sentence with a ", "." /* endSentence */, " but remaining:", tk.remainder);
+                return new Rule(head, bodyOfIf, false);
+            case "," /* bodyTermSeparator */:
+                tk = tk.consume();
+                const bodyContinues = Rule.parseBody(tk);
+                if (tk.current != "." /* endSentence */ && tk.current != "?" /* endQuestion */ && !questionIsImplied)
+                    return consoleOutError("expected end of sentence with one of", "." /* endSentence */, "?" /* endQuestion */, " but remaining:", tk.remainder);
+                return new Rule(head, bodyContinues, isQuestion);
+            default:
+                return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
+        }
     }
     static parseHead(tk) {
         // A head is simply a term. (errors cascade back up)
@@ -542,14 +558,14 @@ class Rule {
         return terms.length == 0 ? null : terms;
     }
 }
-function hasTheImpliedQuestionVar(term) {
+function hasTheImpliedUnboundVar(term) {
     switch (term.type) {
         case "Atom":
-            return false;
+            return term.name === "?" /* impliedQuestionVar */;
         case "Variable":
             return term.name === "?" /* impliedQuestionVar */;
         case "Term":
-            return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
+            return term.partlist.list.some(hasTheImpliedUnboundVar);
     }
 }
 // The Tiny-Prolog parser goes here.
@@ -571,6 +587,14 @@ class Tokeniser {
             this.remainder = r[1];
         }
         if (this.remainder == "") {
+            this.current = "";
+            this.type = "eof";
+            return this;
+        }
+        // comment
+        r = this.remainder.match(/^#(.*)$/);
+        if (r) {
+            this.remainder = "";
             this.current = "";
             this.type = "eof";
             return this;

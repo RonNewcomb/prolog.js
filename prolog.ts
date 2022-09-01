@@ -601,24 +601,43 @@ class Rule {
     const head = Rule.parseHead(tk);
     if (!head) return consoleOutError("syntax error");
 
-    if (tk.current == ops.endSentence) return new Rule(head);
-
     const expected = [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator];
-    const questionIsImplied = hasTheImpliedQuestionVar(head);
-    if (!expected.includes(tk.current as ops) && !questionIsImplied && tk.type != "eof")
-      return consoleOutError("expected one of", expected.join(" "), " but found", tk.remainder);
+    const questionIsImplied = hasTheImpliedUnboundVar(head);
 
-    const endQuestionNow = tk.current == ops.endQuestion;
     const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator || questionIsImplied;
+
+    if (!expected.includes(tk.current as ops) && !questionIsImplied && tk.type != "eof")
+      return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
+
     if (tk.type == "eof") return new Rule(head, null, isQuestion);
-    tk = tk.consume();
 
-    const body = endQuestionNow ? null : Rule.parseBody(tk);
+    switch (tk.current) {
+      case ops.endSentence:
+        tk = tk.consume();
+        return new Rule(head, null, questionIsImplied); // [foo, ?].  same as  [foo, ?]?
 
-    if (!endQuestionNow && tk.current != ops.endSentence && tk.current != ops.endQuestion && !questionIsImplied)
-      return consoleOutError("expected end of sentence with one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
+      case ops.endQuestion:
+        tk = tk.consume();
+        return new Rule(head, null, true);
 
-    return new Rule(head, body, isQuestion);
+      case ops.if:
+        tk = tk.consume();
+        const bodyOfIf = Rule.parseBody(tk);
+        if (tk.current == ops.endSentence) tk = tk.consume();
+        else if (tk.type != "eof")
+          return consoleOutError("expected end of sentence with a ", ops.endSentence, " but remaining:", tk.remainder);
+        return new Rule(head, bodyOfIf, false);
+
+      case ops.bodyTermSeparator:
+        tk = tk.consume();
+        const bodyContinues = Rule.parseBody(tk);
+        if (tk.current != ops.endSentence && tk.current != ops.endQuestion && !questionIsImplied)
+          return consoleOutError("expected end of sentence with one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
+        return new Rule(head, bodyContinues, isQuestion);
+
+      default:
+        return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
+    }
   }
 
   static parseHead(tk: Tokeniser): Term | null {
@@ -639,14 +658,14 @@ class Rule {
   }
 }
 
-function hasTheImpliedQuestionVar(term: Part): boolean {
+function hasTheImpliedUnboundVar(term: Part): boolean {
   switch (term.type) {
     case "Atom":
-      return false;
+      return term.name === ops.impliedQuestionVar;
     case "Variable":
       return term.name === ops.impliedQuestionVar;
     case "Term":
-      return (term.partlist?.list || []).some(hasTheImpliedQuestionVar);
+      return term.partlist.list.some(hasTheImpliedUnboundVar);
   }
 }
 
@@ -676,6 +695,15 @@ class Tokeniser {
     }
 
     if (this.remainder == "") {
+      this.current = "";
+      this.type = "eof";
+      return this;
+    }
+
+    // comment
+    r = this.remainder.match(/^#(.*)$/);
+    if (r) {
+      this.remainder = "";
       this.current = "";
       this.type = "eof";
       return this;
