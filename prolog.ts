@@ -267,21 +267,21 @@ function varNames(parts: Part[]): Variable[] {
 
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
-function answerQuestion(goalList: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //DEBUG: print ("in main prove...\n");
-  if (goalList.length == 0) {
+  if (goals.length == 0) {
     onReport(env);
     //if (!more) return "done";
     return null;
   }
 
-  // Prove the first tuple in the goallist. We do this by trying to
+  // Prove the first tuple in the goals. We do this by trying to
   // unify that tuple with the rules in our database. For each
   // matching rule, replace the tuple with the body of the matching
   // rule, with appropriate substitutions.
-  // Then prove the new goallist. (recursive call)
+  // Then prove the new goals. (recursive call)
 
-  const thisTuple = goalList[0];
+  const thisTuple = goals[0];
   //print ("Debug: thistuple = "); thisTuple.print(); print("\n");
 
   // Do we have a builtin?
@@ -292,7 +292,7 @@ function answerQuestion(goalList: Tuple[], env: Environment, db: Database, level
     // Stick the new body list
     let newGoals = [];
     let j;
-    for (j = 1; j < goalList.length; j++) newGoals[j - 1] = goalList[j];
+    for (j = 1; j < goals.length; j++) newGoals[j - 1] = goals[j];
     return builtin(thisTuple, newGoals, env, db, level + 1, onReport);
   }
 
@@ -327,14 +327,14 @@ function answerQuestion(goalList: Tuple[], env: Environment, db: Database, level
         newGoals[j] = newFirstGoals[j] as Tuple;
         if (rule.body.list[j].excludeThis) newGoals[j].excludeRule = i;
       }
-      for (k = 1; k < goalList.length; k++) newGoals[j++] = goalList[k];
+      for (k = 1; k < goals.length; k++) newGoals[j++] = goals[k];
       const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
       if (ret != null) return ret;
     } else {
-      // Just prove the rest of the goallist, recursively.
+      // Just prove the rest of the goals, recursively.
       let newGoals: Tuple[] = [];
       let j: number;
-      for (j = 1; j < goalList.length; j++) newGoals[j - 1] = goalList[j];
+      for (j = 1; j < goals.length; j++) newGoals[j - 1] = goals[j];
       const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
       if (ret != null) return ret;
     }
@@ -780,10 +780,10 @@ class Tokeniser {
 // compare(First, Second, CmpValue)
 // First, Second must be bound to strings here.
 // CmpValue is bound to -1, 0, 1
-function Comparitor(thisTuple: Tuple, goalList: Tuple[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
+function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //DEBUG print ("in Comparitor.prove()...\n");
   // Prove the builtin bit, then break out and prove
-  // the remaining goalList.
+  // the remaining goals.
 
   // if we were intending to have a resumable builtin (one that can return
   // multiple bindings) then we'd wrap all of this in a while() loop.
@@ -814,14 +814,14 @@ function Comparitor(thisTuple: Tuple, goalList: Tuple[], environment: Environmen
     return null;
   }
 
-  // Just prove the rest of the goallist, recursively.
-  return answerQuestion(goalList, env2, db, level + 1, reportFunction);
+  // Just prove the rest of the goals, recursively.
+  return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
-function Commit(thisTuple: Tuple, goalList: Tuple[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
+function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //DEBUG print ("in Comparitor.prove()...\n");
   // Prove the builtin bit, then break out and prove
-  // the remaining goalList.
+  // the remaining goals.
 
   // if we were intending to have a resumable builtin (one that can return
   // multiple bindings) then we'd wrap all of this in a while() loop.
@@ -831,8 +831,8 @@ function Commit(thisTuple: Tuple, goalList: Tuple[], environment: Environment, d
 
   // On the way through, we do nothing...
 
-  // Just prove the rest of the goallist, recursively.
-  const ret = answerQuestion(goalList, environment, db, level + 1, reportFunction);
+  // Just prove the rest of the goals, recursively.
+  const ret = answerQuestion(goals, environment, db, level + 1, onReport);
 
   // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
   //print ("Debug: backtracking through commit/0: thisTuple.parent = "); thisTuple.parent.print(); print("\n");
@@ -844,7 +844,7 @@ function Commit(thisTuple: Tuple, goalList: Tuple[], environment: Environment, d
 // Given a single argument, it sticks it on the goal list.
 function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Prove the builtin bit, then break out and prove
-  // the remaining goalList.
+  // the remaining goals.
 
   // Rename the variables in the head and body
   // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
@@ -858,7 +858,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   //var newGoal = new Tuple(first.name, renameVariables(first.partlist.list, level, thisTuple));
   //newGoal.parent = thisTuple;
 
-  // Stick this as a new goal on the start of the goallist
+  // Stick this as a new goal on the start of the goals
   const newGoals: Tuple[] = [];
   newGoals[0] = first as Tuple;
   (first as Tuple).parent = thisTuple;
@@ -866,7 +866,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   let j;
   for (j = 0; j < goals.length; j++) newGoals[j + 1] = goals[j];
 
-  // Just prove the rest of the goallist, recursively.
+  // Just prove the rest of the goals, recursively.
   return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 
@@ -919,11 +919,11 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
     return null;
   }
 
-  // Just prove the rest of the goallist, recursively.
+  // Just prove the rest of the goals, recursively.
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
-// Aux function: return the reportFunction to use with a bagof subgoal
+// Aux function: return the onReport to use with a bagof subgoal
 function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunction {
   return function (env: Environment) {
     /*
@@ -1000,7 +1000,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
     return null;
   }
 
-  // Just prove the rest of the goallist, recursively.
+  // Just prove the rest of the goals, recursively.
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
@@ -1062,7 +1062,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
     return null;
   }
 
-  // Just prove the rest of the goallist, recursively.
+  // Just prove the rest of the goals, recursively.
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
