@@ -267,7 +267,7 @@ function answerQuestion(goals, env, db, level, onReport) {
             let j, k;
             for (j = 0; j < newFirstGoals.length; j++) {
                 newGoals[j] = newFirstGoals[j];
-                if (rule.body[j].excludeThis)
+                if (rule.body[j].willExcludeRule)
                     newGoals[j].excludeRule = i;
             }
             for (k = 1; k < goals.length; k++)
@@ -321,7 +321,7 @@ class Tuple {
         this.name = head;
         this.partlist = new Partlist(list);
         this.parent = parent || this;
-        this.excludeThis = excludeThis;
+        this.willExcludeRule = excludeThis;
     }
     static parse(tk) {
         // Tuple -> [NOTTHIS] id ( optParamList )
@@ -330,24 +330,28 @@ class Tuple {
             tk = tk.consume();
             return new Tuple("commit" /* ops.cutCommit */, []);
         }
-        let notthis = tk.current == "NOTTHIS" /* ops.notThis */;
-        if (notthis)
+        let willExclude = tk.current == "NOTTHIS" /* ops.notThis */;
+        if (willExclude)
             tk = tk.consume();
+        //  [
         if (tk.type != "punc" || tk.current != "[" /* ops.open */)
             return consoleOutError(tk, "expected [ to begin");
         tk = tk.consume();
+        //  symbol/var/number/string
         if (tk.type != "id")
-            return consoleOutError(tk, "expected first tuple to be a symbol / bare word");
+            return consoleOutError(tk, "expected first item after [ to be a symbol / bare word");
         const name = tk.current;
         tk = tk.consume();
+        //   ,  or  ]
         if (tk.current == ",")
             tk = tk.consume();
         else if (tk.current != "]")
             return consoleOutError(tk, "expected , or ] after first tuple");
+        //  while not ]  parse items
         const parts = Partlist.parse(tk);
         if (!parts)
             return null;
-        return new Tuple(name, parts, undefined, notthis);
+        return new Tuple(name, parts, undefined, willExclude);
     }
     print() {
         const retval = [];
@@ -406,12 +410,13 @@ class Partlist {
     static parse1(tk) {
         // Part -> var | id | id(optParamList)
         // Part -> [ listBit ] ::-> cons(...)
+        // var?  parse & return
         if (tk.type == "var") {
             const varName = tk.current;
             tk = tk.consume();
             return new Variable(varName);
         }
-        // destructure a list
+        // list destructure?  parse & return
         if (tk.type == "punc" && tk.current == "{" /* ops.openList */) {
             tk = tk.consume();
             // Special case: {} = new atom(nothing).
@@ -450,16 +455,21 @@ class Partlist {
                 append = new Tuple("cons" /* ops.cons */, [parts[i], append]);
             return append;
         }
+        // sub-tuple starts?
         const openbracket = tk.type == "punc" && tk.current == "[" /* ops.open */;
         if (openbracket)
             tk = tk.consume();
+        // bareword or first item in sub-tuple
         const name = tk.current;
         tk = tk.consume();
+        // bareword.  return.
         if (!openbracket)
             return new Atom(name);
+        // ,
         if (tk.current != ",")
             return consoleOutError(tk, "expected , after symbol");
         tk = tk.consume();
+        // while not ] parse items
         const parts = Partlist.parse(tk);
         if (!parts)
             return null;

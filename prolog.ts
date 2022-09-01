@@ -11,7 +11,7 @@ interface Document {
 type Database = Rule[] & { builtin?: { [key: string]: Functor } };
 type FunctorResult = null | boolean;
 interface Environment {
-  [name: string]: Part;
+  [name: string]: TupleItem;
 }
 interface ReportFunction {
   (env: Environment): void;
@@ -151,7 +151,7 @@ function nextline(line: string): Database {
 // environment ///////
 
 // Print out an environment's contents.
-function printEnv(env?: { [key: string]: Part }) {
+function printEnv(env?: { [key: string]: TupleItem }) {
   if (!env) return printAnswerline("Empty.\n");
   const retval: string[] = Object.entries(env).map(([name, part]) => ` ${name} = ${part.print()}\n`);
   printAnswerline(retval.length ? retval.join("") : "Empty.\n");
@@ -178,7 +178,7 @@ function printVars(variables: Variable[], environment: Environment): void {
 }
 
 // The value of x in a given environment
-function value(x: Part, env: Environment): Part {
+function value(x: TupleItem, env: Environment): TupleItem {
   switch (x.type) {
     case "Tuple":
       const parts = x.partlist.list.map(each => value(each, env));
@@ -192,7 +192,7 @@ function value(x: Part, env: Environment): Part {
 }
 
 // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
-function newEnv(name: string, part: Part, oldEnv: Environment): Environment {
+function newEnv(name: string, part: TupleItem, oldEnv: Environment): Environment {
   // We assume that name has been 'unwound' or 'followed' as far as possible
   // in the environment. If this is not the case, we could get an alias loop.
   const newEnv = {} as Environment;
@@ -205,7 +205,7 @@ function newEnv(name: string, part: Part, oldEnv: Environment): Environment {
 
 // Unify two tuples in the current environment. Returns a new environment.
 // On failure, returns null.
-function unify(x: Part, y: Part, env: Environment): Environment | null {
+function unify(x: TupleItem, y: TupleItem, env: Environment): Environment | null {
   x = value(x, env);
   y = value(y, env);
   if (x.type == "Variable") return newEnv(x.name, y, env);
@@ -230,10 +230,10 @@ function unify(x: Part, y: Part, env: Environment): Environment | null {
 // by appending 'level' to each variable name.
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these tuples.
-function renameVariables(list: Part[], level: number, parent?: Tuple): Part[] {
+function renameVariables(list: TupleItem[], level: number, parent?: Tuple): TupleItem[] {
   return list.map(part => renameVariable(part, level, parent));
 }
-function renameVariable(part: Part, level: number, parent?: Tuple): Part {
+function renameVariable(part: TupleItem, level: number, parent?: Tuple): TupleItem {
   switch (part.type) {
     case "Atom":
       return part;
@@ -245,7 +245,7 @@ function renameVariable(part: Part, level: number, parent?: Tuple): Part {
 }
 
 // Return a list of all variables mentioned in a list of Tuples.
-function varNames(parts: Part[]): Variable[] {
+function varNames(parts: TupleItem[]): Variable[] {
   const variables: Variable[] = [];
   for (const part of parts) {
     switch (part.type) {
@@ -325,7 +325,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
       let j: number, k: number;
       for (j = 0; j < newFirstGoals.length; j++) {
         newGoals[j] = newFirstGoals[j] as Tuple;
-        if (rule.body[j].excludeThis) newGoals[j].excludeRule = i;
+        if (rule.body[j].willExcludeRule) newGoals[j].excludeRule = i;
       }
       for (k = 1; k < goals.length; k++) newGoals[j++] = goals[k];
       const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
@@ -360,7 +360,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
 // Parameters {Partlist} = [Part]
 // Part = Variable | Atom | Tuple
 
-type Part = Variable | Atom | Tuple;
+type TupleItem = Variable | Atom | Tuple;
 
 class Variable {
   type: "Variable" = "Variable";
@@ -390,16 +390,16 @@ class Tuple {
   type: "Tuple" = "Tuple";
   name: string;
   partlist: Partlist;
-  excludeThis?: boolean;
+  willExcludeRule?: boolean;
   excludeRule?: number;
   parent: Tuple;
   commit?: boolean;
 
-  constructor(head: string, list: Part[], parent?: Tuple, excludeThis?: boolean) {
+  constructor(head: string, list: TupleItem[], parent?: Tuple, excludeThis?: boolean) {
     this.name = head;
     this.partlist = new Partlist(list);
     this.parent = parent || this;
-    this.excludeThis = excludeThis;
+    this.willExcludeRule = excludeThis;
   }
 
   static parse(tk: Tokeniser): Tuple | null {
@@ -411,30 +411,32 @@ class Tuple {
       return new Tuple(ops.cutCommit, []);
     }
 
-    let notthis = tk.current == ops.notThis;
-    if (notthis) tk = tk.consume();
+    let willExclude = tk.current == ops.notThis;
+    if (willExclude) tk = tk.consume();
 
+    //  [
     if (tk.type != "punc" || tk.current != ops.open) return consoleOutError(tk, "expected [ to begin");
     tk = tk.consume();
 
-    if (tk.type != "id") return consoleOutError(tk, "expected first tuple to be a symbol / bare word");
-
+    //  symbol/var/number/string
+    if (tk.type != "id") return consoleOutError(tk, "expected first item after [ to be a symbol / bare word");
     const name = tk.current;
     tk = tk.consume();
 
+    //   ,  or  ]
     if (tk.current == ",") tk = tk.consume();
     else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
 
+    //  while not ]  parse items
     const parts = Partlist.parse(tk);
     if (!parts) return null;
-
-    return new Tuple(name!, parts, undefined, notthis);
+    return new Tuple(name!, parts, undefined, willExclude);
   }
 
   print(): string {
     const retval: string[] = [];
     if (this.name == ops.cons) {
-      let part: Part = this;
+      let part: TupleItem = this;
       while (part.type == "Tuple" && part.name == ops.cons && part.partlist.list.length == 2) {
         part = part.partlist.list[1];
       }
@@ -464,14 +466,14 @@ class Tuple {
 }
 
 class Partlist {
-  list: Part[];
+  list: TupleItem[];
 
-  constructor(list: Part[]) {
+  constructor(list: TupleItem[]) {
     this.list = list;
   }
 
-  static parse(tk: Tokeniser): Part[] | null {
-    const parts: Part[] = [];
+  static parse(tk: Tokeniser): TupleItem[] | null {
+    const parts: TupleItem[] = [];
     while (tk.current != ops.close) {
       if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tuples until", ops.close);
 
@@ -488,17 +490,18 @@ class Partlist {
   }
 
   // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
-  static parse1(tk: Tokeniser): Part | null {
+  static parse1(tk: Tokeniser): TupleItem | null {
     // Part -> var | id | id(optParamList)
     // Part -> [ listBit ] ::-> cons(...)
 
+    // var?  parse & return
     if (tk.type == "var") {
       const varName = tk.current;
       tk = tk.consume();
       return new Variable(varName);
     }
 
-    // destructure a list
+    // list destructure?  parse & return
     if (tk.type == "punc" && tk.current == ops.openList) {
       tk = tk.consume();
 
@@ -519,7 +522,7 @@ class Partlist {
       }
 
       // Find the end of the list ... "| Var }" or "}".
-      let append: Part;
+      let append: TupleItem;
       if (tk.current == ops.sliceList) {
         tk = tk.consume();
         if (tk.type != "var") return consoleOutError(tk, ops.sliceList, " wasn't followed by a var");
@@ -535,20 +538,24 @@ class Partlist {
       return append;
     }
 
+    // sub-tuple starts?
     const openbracket = tk.type == "punc" && tk.current == ops.open;
     if (openbracket) tk = tk.consume();
 
+    // bareword or first item in sub-tuple
     const name = tk.current;
     tk = tk.consume();
 
+    // bareword.  return.
     if (!openbracket) return new Atom(name);
 
+    // ,
     if (tk.current != ",") return consoleOutError(tk, "expected , after symbol");
     tk = tk.consume();
 
+    // while not ] parse items
     const parts = Partlist.parse(tk);
     if (!parts) return null;
-
     return new Tuple(name, parts);
   }
 
@@ -638,7 +645,7 @@ class Rule {
   }
 }
 
-function hasTheImpliedUnboundVar(tuple: Part): boolean {
+function hasTheImpliedUnboundVar(tuple: TupleItem): boolean {
   switch (tuple.type) {
     case "Atom":
       return tuple.name === ops.impliedQuestionVar;
@@ -830,7 +837,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   // Rename the variables in the head and body
   // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
 
-  const first: Part = value(thisTuple.partlist.list[0], env);
+  const first: TupleItem = value(thisTuple.partlist.list[0], env);
   if (first.type != "Tuple") {
     //print("Debug: Call needs parameter bound to a Tuple, failing\n");
     return null;
@@ -855,12 +862,12 @@ function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   return null; // TODO shouldn't this return True or something?
 }
 
-type AnswerList = Part[] & { renumber?: number };
+type AnswerList = TupleItem[] & { renumber?: number };
 
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // bagof(Tuple, ConditionTuple, ReturnList)
 
-  let collect: Part = value(thisTuple.partlist.list[0], env);
+  let collect: TupleItem = value(thisTuple.partlist.list[0], env);
   const subgoal = value(thisTuple.partlist.list[1], env) as Tuple;
   const into = value(thisTuple.partlist.list[2], env);
 
@@ -878,7 +885,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   // Turn anslist into a proper list and unify with 'into'
 
   // optional here: nothing anslist -> fail?
-  let answers: Part = new Atom(ops.nothing);
+  let answers: TupleItem = new Atom(ops.nothing);
 
   /*
         print("Debug: anslist = [");
@@ -904,7 +911,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
 }
 
 // Aux function: return the onReport to use with a bagof subgoal
-function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunction {
+function BagOfCollectFunction(collect: TupleItem, anslist: AnswerList): ReportFunction {
   return function (env: Environment) {
     /*
                 print("DEBUG: solution in bagof/3 found...\n");
@@ -916,7 +923,7 @@ function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunctio
                 printEnv(env);
                 */
     // Rename this appropriately and throw it into anslist
-    anslist[anslist.length] = renameVariable(value(collect, env), anslist.renumber!--) as Part;
+    anslist[anslist.length] = renameVariable(value(collect, env), anslist.renumber!--) as TupleItem;
   };
 }
 
@@ -941,7 +948,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: Part = value(thisTuple.partlist.list[1], env);
+  let second: TupleItem = value(thisTuple.partlist.list[1], env);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
@@ -1000,7 +1007,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: Part = value(thisTuple.partlist.list[1], env);
+  let second: TupleItem = value(thisTuple.partlist.list[1], env);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
