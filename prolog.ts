@@ -81,10 +81,10 @@ function printAnswerline(str: string) {
   div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
 }
 
-function consoleOutError(...rest: any[]): null {
+function consoleOutError(tk: Tokeniser, ...rest: any[]): null {
   const div = newConsoleLine();
   div.classList.add("errdiv");
-  div.innerHTML = "<span class=err>" + rest.join(" ") + "</span>";
+  div.innerHTML = "<div><div><span class=err>" + rest.join(" ") + "</span></div><div>" + tk.current + tk.remainder + "</div></div>";
   newConsoleLine();
   return null;
 }
@@ -307,7 +307,7 @@ function answerQuestion(goalList: Term[], env: Environment, db: Database, level:
     if (!rule.head) continue;
 
     if (rule.head.name != thisTerm.name) {
-      //consoleOutError("DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
+      //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
       continue;
     }
 
@@ -401,6 +401,37 @@ class Term {
     this.parent = this;
   }
 
+  static parse(tk: Tokeniser): Term | null {
+    // Term -> [NOTTHIS] id ( optParamList )
+
+    if (/*tk.type == "id" && */ tk.current == ops.cutCommit) {
+      // Parse bareword commit as commit/0
+      tk = tk.consume();
+      return new Term(ops.cutCommit, []);
+    }
+
+    let notthis = tk.current == ops.notThis;
+    if (notthis) tk = tk.consume();
+
+    if (tk.type != "punc" || tk.current != ops.open) return consoleOutError(tk, "expected [ to begin");
+    tk = tk.consume();
+
+    if (tk.type != "id") return consoleOutError(tk, "expected first term to be a symbol / bare word");
+
+    const name = tk.current;
+    tk = tk.consume();
+
+    if (tk.current == ",") tk = tk.consume();
+    else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first term. Current=", tk.current);
+
+    const parts = Partlist.parse(tk);
+    if (!parts) return null;
+
+    const term = new Term(name!, parts);
+    term.excludeThis = notthis;
+    return term;
+  }
+
   print(): string {
     const retval: string[] = [];
     if (this.name == ops.cons) {
@@ -431,37 +462,6 @@ class Term {
     retval.push(ops.close);
     return retval.join("");
   }
-
-  static parse(tk: Tokeniser): Term | null {
-    // Term -> [NOTTHIS] id ( optParamList )
-
-    if (/*tk.type == "id" && */ tk.current == ops.cutCommit) {
-      // Parse bareword commit as commit/0
-      tk = tk.consume();
-      return new Term(ops.cutCommit, []);
-    }
-
-    let notthis = tk.current == ops.notThis;
-    if (notthis) tk = tk.consume();
-
-    if (tk.type != "punc" || tk.current != ops.open) return consoleOutError("expected [ to begin");
-    tk = tk.consume();
-
-    if (tk.type != "id") return consoleOutError("expected first term to be a symbol / bare word");
-
-    const name = tk.current;
-    tk = tk.consume();
-
-    if (tk.current == ",") tk = tk.consume();
-    else if (tk.current != "]") return consoleOutError("expected , or ] after first term. Current=", tk.current);
-
-    const parts = Partlist.parse(tk);
-    if (!parts) return null;
-
-    const term = new Term(name!, parts);
-    term.excludeThis = notthis;
-    return term;
-  }
 }
 
 class Partlist {
@@ -471,21 +471,17 @@ class Partlist {
     this.list = list;
   }
 
-  print(): string {
-    return this.list.map(each => ", " + each.print()).join("");
-  }
-
   static parse(tk: Tokeniser): Part[] | null {
     const parts: Part[] = [];
     while (tk.current != ops.close) {
-      if (tk.type == "eof") return consoleOutError("unexpected EOF while running through terms until", ops.close);
+      if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through terms until", ops.close);
 
       const part = Partlist.parse1(tk);
-      if (part == null) return consoleOutError("part didn't parse at", tk.current, "remaining:", tk.remainder);
+      if (part == null) return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
       parts.push(part);
 
       if (tk.current == ",") tk = tk.consume();
-      else if (tk.current != ops.close) return consoleOutError("a term, a part, ended before the , or the ]   remaining: ", tk.remainder);
+      else if (tk.current != ops.close) return consoleOutError(tk, "a term, a part, ended before the , or the ]  but instead got");
     }
     tk = tk.consume();
     return parts;
@@ -516,7 +512,7 @@ class Partlist {
       const parts = [];
       while (true) {
         const part = Partlist.parse1(tk);
-        if (part == null) return consoleOutError("can't understand this part of a list destructuring:", tk.remainder);
+        if (part == null) return consoleOutError(tk, "can't understand this part of a list destructuring");
         parts.push(part);
         if (tk.current != ",") break;
         tk = tk.consume();
@@ -526,13 +522,13 @@ class Partlist {
       let append: Part;
       if (tk.current == ops.sliceList) {
         tk = tk.consume();
-        if (tk.type != "var") return consoleOutError(ops.sliceList, " wasn't followed by a var");
+        if (tk.type != "var") return consoleOutError(tk, ops.sliceList, " wasn't followed by a var");
         append = new Variable(tk.current!);
         tk = tk.consume();
       } else {
         append = new Atom(ops.nothing);
       }
-      if (tk.current != ops.closeList) return consoleOutError("list destructure wasn't ended by }");
+      if (tk.current != ops.closeList) return consoleOutError(tk, "list destructure wasn't ended by }");
       tk = tk.consume();
       // Return the new cons.... of all this rubbish.
       for (let i = parts.length - 1; i >= 0; i--) append = new Term(ops.cons, [parts[i], append]);
@@ -547,13 +543,17 @@ class Partlist {
 
     if (!openbracket) return new Atom(name);
 
-    if (tk.current != ",") return consoleOutError("expected , after symbol");
+    if (tk.current != ",") return consoleOutError(tk, "expected , after symbol");
     tk = tk.consume();
 
     const parts = Partlist.parse(tk);
     if (!parts) return null;
 
     return new Term(name, parts);
+  }
+
+  print(): string {
+    return this.list.map(each => ", " + each.print()).join("");
   }
 }
 
@@ -586,20 +586,10 @@ class Rule {
     }
   }
 
-  print(): string {
-    const retval: string[] = [];
-    if (this.head) retval.push(this.head.print());
-    if (this.head && this.body) retval.push(ops.if);
-    if (this.body) retval.push(this.body.print());
-    retval.push(this.asking ? ops.endQuestion : ops.endSentence);
-    retval.push("\n");
-    return retval.join(" ");
-  }
-
   // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
   static parse(tk: Tokeniser): Rule | null {
     const head = Rule.parseHead(tk);
-    if (!head) return consoleOutError("syntax error");
+    if (!head) return consoleOutError(tk, "syntax error");
 
     const expected = [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTermSeparator];
     const questionIsImplied = hasTheImpliedUnboundVar(head);
@@ -607,14 +597,14 @@ class Rule {
     const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTermSeparator || questionIsImplied;
 
     if (!expected.includes(tk.current as ops) && !questionIsImplied && tk.type != "eof")
-      return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
+      return consoleOutError(tk, "expected one of ", expected.join(" "), "  but instead got");
 
     if (tk.type == "eof") return new Rule(head, null, isQuestion);
 
     switch (tk.current) {
       case ops.endSentence:
         tk = tk.consume();
-        return new Rule(head, null, questionIsImplied); // [foo, ?].  same as  [foo, ?]?  but not same as [foo, anything].
+        return new Rule(head, null, false); // [foo, ?].  same as [foo, anything]. but not same as [foo, ?]?
 
       case ops.endQuestion:
         tk = tk.consume();
@@ -624,18 +614,18 @@ class Rule {
         tk = tk.consume();
         const bodyOfIf = Rule.parseBody(tk);
         if (tk.current == ops.endSentence) tk = tk.consume();
-        else if (tk.type != "eof") return consoleOutError("expected end of sentence with a ", ops.endSentence, " but remaining:", tk.remainder);
+        else if (tk.type != "eof") return consoleOutError(tk, "expected end of sentence with a ", ops.endSentence, " but instead got ");
         return new Rule(head, bodyOfIf, false);
 
       case ops.bodyTermSeparator:
         tk = tk.consume();
         const bodyContinues = Rule.parseBody(tk);
         if (tk.current == ops.endQuestion) tk.consume();
-        else if (tk.type != "eof") return consoleOutError("expected end of complex question with", ops.endQuestion, "but instead got ", tk.remainder);
+        else if (tk.type != "eof") return consoleOutError(tk, "expected complex question to end with", ops.endQuestion, "but instead got ");
         return new Rule(head, bodyContinues, true);
 
       default:
-        return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
+        return consoleOutError(tk, "expected one of ", expected.join(" "), "  but instead got");
     }
   }
 
@@ -654,6 +644,16 @@ class Rule {
       tk = tk.consume();
     }
     return terms.length == 0 ? null : terms;
+  }
+
+  print(): string {
+    const retval: string[] = [];
+    if (this.head) retval.push(this.head.print());
+    if (this.head && this.body) retval.push(ops.if);
+    if (this.body) retval.push(this.body.print());
+    retval.push(this.asking ? ops.endQuestion : ops.endSentence);
+    retval.push("\n");
+    return retval.join(" ");
   }
 }
 
@@ -708,8 +708,8 @@ class Tokeniser {
       return this;
     }
 
-    // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if  query ?-
-    r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|\bif\b|\?\-)(.*)$/);
+    // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
+    r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/);
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
@@ -762,7 +762,7 @@ class Tokeniser {
       return this;
     }
 
-    if (this.remainder) consoleOutError("Tokenizer doesn't recognize ", this.remainder);
+    if (this.remainder) consoleOutError(this, "Cannot recognize this");
 
     // eof?
     this.current = "";

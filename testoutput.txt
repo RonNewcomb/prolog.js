@@ -140,7 +140,8 @@ The B is anything.
 The L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
 The N is 21.
 [bagof, c, [triple, sc, A, B], L], [length, L, N].
-expected end of complex question with ? but instead got
+expected complex question to end with ? but instead got
+.
  
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .
