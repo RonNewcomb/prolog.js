@@ -137,9 +137,9 @@ function nextline(line: string): Database {
     let reported = false;
     const reportFn = (env: Environment) => {
       reported = true;
-      printVars(varNames(rule.body!.list), env);
+      printVars(varNames(rule.body!), env);
     };
-    answerQuestion(renameVariables(rule.body!.list, 0) as Tuple[], {} as Environment, database, 1, reportFn);
+    answerQuestion(renameVariables(rule.body!, 0) as Tuple[], {} as Environment, database, 1, reportFn);
     if (!reported) printAnswerline("No.\n");
   } else {
     database.push(rule);
@@ -319,13 +319,13 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     if (env2 == null) continue;
 
     if (rule.body != null) {
-      const newFirstGoals = renameVariables(rule.body.list, level, renamedHead);
+      const newFirstGoals = renameVariables(rule.body, level, renamedHead);
       // Stick the new body list
       let newGoals: Tuple[] = [];
       let j: number, k: number;
       for (j = 0; j < newFirstGoals.length; j++) {
         newGoals[j] = newFirstGoals[j] as Tuple;
-        if (rule.body.list[j].excludeThis) newGoals[j].excludeRule = i;
+        if (rule.body[j].excludeThis) newGoals[j].excludeRule = i;
       }
       for (k = 1; k < goals.length; k++) newGoals[j++] = goals[k];
       const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
@@ -557,42 +557,18 @@ class Partlist {
   }
 }
 
-class Body {
-  list: Tuple[];
-
-  constructor(list: Tuple[]) {
-    this.list = list;
-  }
-
-  print(): string {
-    return this.list.map(each => each.print()).join(", ");
-  }
-
-  static parse(tk: Tokeniser): Tuple[] | null {
-    const tuples: Tuple[] = [];
-    while (true) {
-      const tuple = Tuple.parse(tk);
-      if (tuple == null) break;
-      tuples.push(tuple);
-      if (tk.current != ",") break;
-      tk = tk.consume();
-    }
-    return tuples.length == 0 ? null : tuples;
-  }
-}
-
 class Rule {
   head: Tuple | null;
-  body: Body | null;
+  body: Tuple[] | null;
   asking: boolean;
 
-  constructor(head: Tuple, bodylist: Tuple[] | null = null, isQuestion: boolean = false) {
+  constructor(head: Tuple, query: Tuple[] | null = null, isQuestion: boolean = false) {
     this.asking = isQuestion;
     if (isQuestion) {
-      this.body = new Body(bodylist != null ? [head].concat(bodylist) : [head]);
+      this.body = query != null ? [head].concat(query) : [head];
       this.head = null;
     } else {
-      this.body = bodylist != null ? new Body(bodylist) : null;
+      this.body = query;
       this.head = head;
     }
   }
@@ -622,14 +598,14 @@ class Rule {
 
       case ops.if:
         tk = tk.consume();
-        const bodyOfIf = Body.parse(tk);
+        const bodyOfIf = Rule.parseBody(tk);
         if (tk.current == ops.endSentence) tk = tk.consume();
         else if (tk.type != "eof") return consoleOutError(tk, "expected end of sentence with a ", ops.endSentence, " but instead got ");
         return new Rule(head, bodyOfIf, false);
 
       case ops.bodyTupleSeparator:
         tk = tk.consume();
-        const bodyContinues = Body.parse(tk);
+        const bodyContinues = Rule.parseBody(tk);
         if (tk.current == ops.endQuestion) tk.consume();
         else if (tk.type != "eof") return consoleOutError(tk, "expected complex question to end with", ops.endQuestion, "but instead got ");
         return new Rule(head, bodyContinues, true);
@@ -639,11 +615,23 @@ class Rule {
     }
   }
 
+  static parseBody(tk: Tokeniser): Tuple[] | null {
+    const tuples: Tuple[] = [];
+    while (true) {
+      const tuple = Tuple.parse(tk);
+      if (tuple == null) break;
+      tuples.push(tuple);
+      if (tk.current != ",") break;
+      tk = tk.consume();
+    }
+    return tuples.length == 0 ? null : tuples;
+  }
+
   print(): string {
     const retval: string[] = [];
     if (this.head) retval.push(this.head.print());
     if (this.head && this.body) retval.push(ops.if);
-    if (this.body) retval.push(this.body.print());
+    if (this.body) retval.push(this.body.map(each => each.print()).join(", "));
     retval.push(this.asking ? ops.endQuestion : ops.endSentence);
     retval.push("\n");
     return retval.join(" ");
