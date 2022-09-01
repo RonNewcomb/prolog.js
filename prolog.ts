@@ -139,7 +139,7 @@ function nextline(line: string): Database {
       reported = true;
       printVars(varNames(rule.body!.list), env);
     };
-    answerQuestion(renameVariables(rule.body!.list, 0, []) as Tuple[], {} as Environment, database, 1, reportFn);
+    answerQuestion(renameVariables(rule.body!.list, 0) as Tuple[], {} as Environment, database, 1, reportFn);
     if (!reported) printAnswerline("No.\n");
   } else {
     database.push(rule);
@@ -230,17 +230,17 @@ function unify(x: Part, y: Part, env: Environment): Environment | null {
 // by appending 'level' to each variable name.
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these tuples.
-function renameVariables(list: Part[] | Part, level: number, parent: Tuple[] | Tuple): Part[] | Part {
-  return Array.isArray(list) ? list.map(part => renameVariable(part, level, parent) as Part) : renameVariable(list, level, parent);
+function renameVariables(list: Part[], level: number, parent?: Tuple): Part[] {
+  return list.map(part => renameVariable(part, level, parent));
 }
-function renameVariable(part: Part, level: number, parent: Tuple[] | Tuple): Part {
+function renameVariable(part: Part, level: number, parent?: Tuple): Part {
   switch (part.type) {
     case "Atom":
       return part;
     case "Variable":
       return new Variable(part.name + "." + level);
     case "Tuple":
-      return new Tuple(part.name, renameVariables(part.partlist.list, level, parent) as Part[], parent as Tuple);
+      return new Tuple(part.name, renameVariables(part.partlist.list, level, parent), parent);
   }
 }
 
@@ -312,14 +312,14 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     }
 
     // Rename the variables in the head and body
-    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level, thisTuple) as Part[]);
+    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level, thisTuple));
     // renamedHead.ruleNumber = i;
 
     const env2 = unify(thisTuple, renamedHead, env);
     if (env2 == null) continue;
 
     if (rule.body != null) {
-      const newFirstGoals = renameVariables(rule.body.list, level, renamedHead) as Part[];
+      const newFirstGoals = renameVariables(rule.body.list, level, renamedHead);
       // Stick the new body list
       let newGoals: Tuple[] = [];
       let j: number, k: number;
@@ -853,8 +853,8 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
 
   // Stick this as a new goal on the start of the goals
   const newGoals: Tuple[] = [];
-  newGoals[0] = first as Tuple;
-  (first as Tuple).parent = thisTuple;
+  newGoals[0] = first;
+  first.parent = thisTuple;
 
   let j;
   for (j = 0; j < goals.length; j++) newGoals[j + 1] = goals[j];
@@ -876,8 +876,8 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   const subgoal = value(thisTuple.partlist.list[1], env) as Tuple;
   const into = value(thisTuple.partlist.list[2], env);
 
-  collect = renameVariables(collect, level, thisTuple) as Part;
-  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple) as Part[], thisTuple);
+  collect = renameVariable(collect, level, thisTuple);
+  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple), thisTuple);
 
   const newGoals = [];
   newGoals[0] = newGoal;
@@ -928,7 +928,7 @@ function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunctio
                 printEnv(env);
                 */
     // Rename this appropriately and throw it into anslist
-    anslist[anslist.length] = renameVariables(value(collect, env), anslist.renumber!--, []) as Part;
+    anslist[anslist.length] = renameVariable(value(collect, env), anslist.renumber!--) as Part;
   };
 }
 

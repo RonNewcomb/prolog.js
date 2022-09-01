@@ -87,7 +87,7 @@ function nextline(line) {
             reported = true;
             printVars(varNames(rule.body.list), env);
         };
-        answerQuestion(renameVariables(rule.body.list, 0, []), {}, database, 1, reportFn);
+        answerQuestion(renameVariables(rule.body.list, 0), {}, database, 1, reportFn);
         if (!reported)
             printAnswerline("No.\n");
     }
@@ -179,7 +179,7 @@ function unify(x, y, env) {
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these tuples.
 function renameVariables(list, level, parent) {
-    return Array.isArray(list) ? list.map(part => renameVariable(part, level, parent)) : renameVariable(list, level, parent);
+    return list.map(part => renameVariable(part, level, parent));
 }
 function renameVariable(part, level, parent) {
     switch (part.type) {
@@ -741,7 +741,7 @@ function BagOf(thisTuple, goals, env, db, level, onReport) {
     let collect = value(thisTuple.partlist.list[0], env);
     const subgoal = value(thisTuple.partlist.list[1], env);
     const into = value(thisTuple.partlist.list[2], env);
-    collect = renameVariables(collect, level, thisTuple);
+    collect = renameVariable(collect, level, thisTuple);
     const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple), thisTuple);
     const newGoals = [];
     newGoals[0] = newGoal;
@@ -784,7 +784,7 @@ function BagOfCollectFunction(collect, anslist) {
                     printEnv(env);
                     */
         // Rename this appropriately and throw it into anslist
-        anslist[anslist.length] = renameVariables(value(collect, env), anslist.renumber--, []);
+        anslist[anslist.length] = renameVariable(value(collect, env), anslist.renumber--);
     };
 }
 // Call out to external javascript
