@@ -481,7 +481,8 @@ class Partlist {
       parts.push(part);
 
       if (tk.current == ",") tk = tk.consume();
-      else if (tk.current != ops.close) return consoleOutError(tk, "a term, a part, ended before the , or the ]  but instead got");
+      else if (tk.current != ops.close)
+        return consoleOutError(tk, "a term ended before the " + ops.bodyTermSeparator + " or the " + ops.close + "  but instead got");
     }
     tk = tk.consume();
     return parts;
@@ -575,14 +576,13 @@ class Rule {
   asking: boolean;
 
   constructor(head: Term, bodylist: Term[] | null = null, isQuestion: boolean = false) {
+    this.asking = isQuestion;
     if (isQuestion) {
-      this.head = null;
       this.body = new Body(bodylist != null ? [head].concat(bodylist) : [head]);
-      this.asking = isQuestion;
+      this.head = null;
     } else {
-      this.head = head;
       this.body = bodylist != null ? new Body(bodylist) : null;
-      this.asking = isQuestion;
+      this.head = head;
     }
   }
 
@@ -668,6 +668,8 @@ function hasTheImpliedUnboundVar(term: Part): boolean {
   }
 }
 
+const newVars = false;
+
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
   remainder: string;
@@ -699,17 +701,9 @@ class Tokeniser {
       return this;
     }
 
-    // comment
-    r = this.remainder.match(/^#(.*)$/);
-    if (r) {
-      this.remainder = "";
-      this.current = "";
-      this.type = "eof";
-      return this;
-    }
-
     // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
-    r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/);
+    if (newVars) r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/);
+    else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/);
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
@@ -718,7 +712,8 @@ class Tokeniser {
     }
 
     // variable    including ? as varName
-    r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
+    if (newVars) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
+    else r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
@@ -762,10 +757,18 @@ class Tokeniser {
       return this;
     }
 
-    if (this.remainder) consoleOutError(this, "Cannot recognize this");
+    // comment
+    r = this.remainder.match(/^#(.*)$/);
+    if (r) {
+      this.remainder = "";
+      this.current = "";
+      this.type = "eof";
+      return this;
+    }
 
     // eof?
     this.current = "";
+    if (this.remainder) consoleOutError(this, "Cannot recognize this");
     this.type = "eof";
     return this;
   }
@@ -890,7 +893,7 @@ function BagOf(thisTerm: Term, goals: Term[], env: Environment, db: Database, le
   // Prove this subgoal, collecting up the environments...
   const anslist = [] as AnswerList;
   anslist.renumber = -1;
-  const ret = answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, anslist));
+  answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, anslist));
 
   // Turn anslist into a proper list and unify with 'into'
 
