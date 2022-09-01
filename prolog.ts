@@ -181,7 +181,7 @@ function printVars(variables: Variable[], environment: Environment): void {
 function value(x: Part, env: Environment): Part {
   switch (x.type) {
     case "Term":
-      const parts = x.partlist.list.map((each) => value(each, env));
+      const parts = x.partlist.list.map(each => value(each, env));
       return new Term(x.name, parts);
     case "Atom":
       return x; // We only need to check the values of variables...
@@ -229,7 +229,7 @@ function unify(x: Part, y: Part, env: Environment): Environment | null {
 // How non-graph-theoretical can this get?!?
 // "parent" points to the subgoal, the expansion of which lead to these terms.
 function renameVariables(list: Part[] | Part, level: number, parent: Term[] | Term): Part[] | Part {
-  return Array.isArray(list) ? list.map((part) => renameVariable(part, level, parent) as Part) : renameVariable(list, level, parent);
+  return Array.isArray(list) ? list.map(part => renameVariable(part, level, parent) as Part) : renameVariable(list, level, parent);
 }
 function renameVariable(part: Part, level: number, parent: Term[] | Term): Part {
   switch (part.type) {
@@ -252,12 +252,12 @@ function varNames(parts: Part[]): Variable[] {
       case "Atom":
         continue;
       case "Variable":
-        if (!variables.find((o) => o.name == part.name)) variables.push(part);
+        if (!variables.find(o => o.name == part.name)) variables.push(part);
         continue;
       case "Term":
         const nestedVariables = varNames(part.partlist.list);
         for (const nestedVariable of nestedVariables) {
-          if (!variables.find((o) => o.name == nestedVariable.name)) variables.push(nestedVariable);
+          if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
         }
         continue;
     }
@@ -472,7 +472,7 @@ class Partlist {
   }
 
   print(): string {
-    return this.list.map((each) => ", " + each.print()).join("");
+    return this.list.map(each => ", " + each.print()).join("");
   }
 
   static parse(tk: Tokeniser): Part[] | null {
@@ -565,7 +565,7 @@ class Body {
   }
 
   print(): string {
-    return this.list.map((each) => each.print()).join(", ");
+    return this.list.map(each => each.print()).join(", ");
   }
 }
 
@@ -614,7 +614,7 @@ class Rule {
     switch (tk.current) {
       case ops.endSentence:
         tk = tk.consume();
-        return new Rule(head, null, questionIsImplied); // [foo, ?].  same as  [foo, ?]?
+        return new Rule(head, null, questionIsImplied); // [foo, ?].  same as  [foo, ?]?  but not same as [foo, anything].
 
       case ops.endQuestion:
         tk = tk.consume();
@@ -624,16 +624,15 @@ class Rule {
         tk = tk.consume();
         const bodyOfIf = Rule.parseBody(tk);
         if (tk.current == ops.endSentence) tk = tk.consume();
-        else if (tk.type != "eof")
-          return consoleOutError("expected end of sentence with a ", ops.endSentence, " but remaining:", tk.remainder);
+        else if (tk.type != "eof") return consoleOutError("expected end of sentence with a ", ops.endSentence, " but remaining:", tk.remainder);
         return new Rule(head, bodyOfIf, false);
 
       case ops.bodyTermSeparator:
         tk = tk.consume();
         const bodyContinues = Rule.parseBody(tk);
-        if (tk.current != ops.endSentence && tk.current != ops.endQuestion && !questionIsImplied)
-          return consoleOutError("expected end of sentence with one of", ops.endSentence, ops.endQuestion, " but remaining:", tk.remainder);
-        return new Rule(head, bodyContinues, isQuestion);
+        if (tk.current == ops.endQuestion) tk.consume();
+        else if (tk.type != "eof") return consoleOutError("expected end of complex question with", ops.endQuestion, "but instead got ", tk.remainder);
+        return new Rule(head, bodyContinues, true);
 
       default:
         return consoleOutError("expected one of ", expected.join(" "), " but found ", tk.remainder);
@@ -778,14 +777,7 @@ class Tokeniser {
 // compare(First, Second, CmpValue)
 // First, Second must be bound to strings here.
 // CmpValue is bound to -1, 0, 1
-function Comparitor(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function Comparitor(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
   //DEBUG print ("in Comparitor.prove()...\n");
   // Prove the builtin bit, then break out and prove
   // the remaining goalList.
@@ -823,14 +815,7 @@ function Comparitor(
   return answerQuestion(goalList, env2, db, level + 1, reportFunction);
 }
 
-function Commit(
-  thisTerm: Term,
-  goalList: Term[],
-  environment: Environment,
-  db: Database,
-  level: number,
-  reportFunction: ReportFunction
-): FunctorResult {
+function Commit(thisTerm: Term, goalList: Term[], environment: Environment, db: Database, level: number, reportFunction: ReportFunction): FunctorResult {
   //DEBUG print ("in Comparitor.prove()...\n");
   // Prove the builtin bit, then break out and prove
   // the remaining goalList.
@@ -913,13 +898,13 @@ function BagOf(thisTerm: Term, goals: Term[], env: Environment, db: Database, le
   let answers: Part = new Atom(ops.nothing);
 
   /*
-    print("Debug: anslist = [");
-        for (var j = 0; j < anslist.length; j++) {
-            anslist[j].print();
-            print(", ");
-        }
-    print("]\n");
-    */
+        print("Debug: anslist = [");
+            for (var j = 0; j < anslist.length; j++) {
+                anslist[j].print();
+                print(", ");
+            }
+        print("]\n");
+        */
 
   for (var i = anslist.length; i > 0; i--) answers = new Term(ops.cons, [anslist[i - 1], answers]);
 
@@ -939,14 +924,14 @@ function BagOf(thisTerm: Term, goals: Term[], env: Environment, db: Database, le
 function BagOfCollectFunction(collect: Part, anslist: AnswerList): ReportFunction {
   return function (env: Environment) {
     /*
-        print("DEBUG: solution in bagof/3 found...\n");
-        print("Value of collection term ");
-        collect.print();
-        print(" in this environment = ");
-        (value(collect, env)).print();
-        print("\n");
-        printEnv(env);
-        */
+                print("DEBUG: solution in bagof/3 found...\n");
+                print("Value of collection term ");
+                collect.print();
+                print(" in this environment = ");
+                (value(collect, env)).print();
+                print("\n");
+                printEnv(env);
+                */
     // Rename this appropriately and throw it into anslist
     anslist[anslist.length] = renameVariables(value(collect, env), anslist.renumber!--, []) as Part;
   };
@@ -1016,14 +1001,7 @@ function ExternalJS(thisTerm: Term, goals: Term[], env: Environment, db: Databas
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
-function ExternalAndParse(
-  thisTerm: Term,
-  goals: Term[],
-  env: Environment,
-  db: Database,
-  level: number,
-  onReport: ReportFunction
-): FunctorResult {
+function ExternalAndParse(thisTerm: Term, goals: Term[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   //print ("DEBUG: in External...\n");
 
   // Get the first term, the template.

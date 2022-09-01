@@ -134,14 +134,14 @@ The B is anything.
 The L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
 The N is 21.
 [bagof, c, [triple, sc, A, B], L], [length, L, N]
-expected end of sentence with one of . ? but remaining:
- 
-[bagof, c, [triple, sc, A, B], L], [length, L, N].
 [bagof, c, [triple, sc, The A, The B], The L], [length, The L, The N] ?
 The A is anything.
 The B is anything.
 The L is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
 The N is 21.
+[bagof, c, [triple, sc, A, B], L], [length, L, N].
+expected end of complex question with ? but instead got
+ 
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .
 Memorized.
