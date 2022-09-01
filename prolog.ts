@@ -214,10 +214,12 @@ function unify(x: Part, y: Part, env: Environment): Environment | null {
 
   // x.type == y.type == Tuple...
   if (x.name != y.name) return null; // Ooh, so first-order.
-  if (x.partlist.list.length != y.partlist.list.length) return null;
+  const xs = x.partlist.list;
+  const ys = y.partlist.list;
+  if (xs.length != ys.length) return null;
 
-  for (var i = 0; i < (x as Tuple).partlist.list.length; i++) {
-    env = unify((x as Tuple).partlist.list[i], (y as Tuple).partlist.list[i], env)!;
+  for (let i = 0; i < xs.length; i++) {
+    env = unify(xs[i], ys[i], env)!;
     if (env == null) return null;
   }
 
@@ -238,9 +240,7 @@ function renameVariable(part: Part, level: number, parent: Tuple[] | Tuple): Par
     case "Variable":
       return new Variable(part.name + "." + level);
     case "Tuple":
-      const tuple = new Tuple(part.name, renameVariables(part.partlist.list, level, parent) as Part[]);
-      tuple.parent = parent as Tuple;
-      return tuple;
+      return new Tuple(part.name, renameVariables(part.partlist.list, level, parent) as Part[], parent as Tuple);
   }
 }
 
@@ -395,10 +395,11 @@ class Tuple {
   parent: Tuple;
   commit?: boolean;
 
-  constructor(head: string, list: Part[]) {
+  constructor(head: string, list: Part[], parent?: Tuple, excludeThis?: boolean) {
     this.name = head;
     this.partlist = new Partlist(list);
-    this.parent = this;
+    this.parent = parent || this;
+    this.excludeThis = excludeThis;
   }
 
   static parse(tk: Tokeniser): Tuple | null {
@@ -427,9 +428,7 @@ class Tuple {
     const parts = Partlist.parse(tk);
     if (!parts) return null;
 
-    const tuple = new Tuple(name!, parts);
-    tuple.excludeThis = notthis;
-    return tuple;
+    return new Tuple(name!, parts, undefined, notthis);
   }
 
   print(): string {
@@ -568,6 +567,18 @@ class Body {
   print(): string {
     return this.list.map(each => each.print()).join(", ");
   }
+
+  static parse(tk: Tokeniser): Tuple[] | null {
+    const tuples: Tuple[] = [];
+    while (true) {
+      const tuple = Tuple.parse(tk);
+      if (tuple == null) break;
+      tuples.push(tuple);
+      if (tk.current != ",") break;
+      tk = tk.consume();
+    }
+    return tuples.length == 0 ? null : tuples;
+  }
 }
 
 class Rule {
@@ -588,12 +599,11 @@ class Rule {
 
   // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
   static parse(tk: Tokeniser): Rule | null {
-    const head = Rule.parseHead(tk);
+    const head = Tuple.parse(tk);
     if (!head) return consoleOutError(tk, "syntax error");
 
     const expected = [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTupleSeparator];
     const questionIsImplied = hasTheImpliedUnboundVar(head);
-
     const isQuestion = tk.current == ops.endQuestion || tk.current == ops.bodyTupleSeparator || questionIsImplied;
 
     if (!expected.includes(tk.current as ops) && !questionIsImplied && tk.type != "eof")
@@ -612,14 +622,14 @@ class Rule {
 
       case ops.if:
         tk = tk.consume();
-        const bodyOfIf = Rule.parseBody(tk);
+        const bodyOfIf = Body.parse(tk);
         if (tk.current == ops.endSentence) tk = tk.consume();
         else if (tk.type != "eof") return consoleOutError(tk, "expected end of sentence with a ", ops.endSentence, " but instead got ");
         return new Rule(head, bodyOfIf, false);
 
       case ops.bodyTupleSeparator:
         tk = tk.consume();
-        const bodyContinues = Rule.parseBody(tk);
+        const bodyContinues = Body.parse(tk);
         if (tk.current == ops.endQuestion) tk.consume();
         else if (tk.type != "eof") return consoleOutError(tk, "expected complex question to end with", ops.endQuestion, "but instead got ");
         return new Rule(head, bodyContinues, true);
@@ -627,23 +637,6 @@ class Rule {
       default:
         return consoleOutError(tk, "expected one of ", expected.join(" "), "  but instead got");
     }
-  }
-
-  static parseHead(tk: Tokeniser): Tuple | null {
-    // A head is simply a tuple. (errors cascade back up)
-    return Tuple.parse(tk);
-  }
-
-  static parseBody(tk: Tokeniser): Tuple[] | null {
-    const tuples: Tuple[] = [];
-    while (true) {
-      const tuple = Tuple.parse(tk);
-      if (tuple == null) break;
-      tuples.push(tuple);
-      if (tk.current != ",") break;
-      tk = tk.consume();
-    }
-    return tuples.length == 0 ? null : tuples;
   }
 
   print(): string {
@@ -884,8 +877,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   const into = value(thisTuple.partlist.list[2], env);
 
   collect = renameVariables(collect, level, thisTuple) as Part;
-  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple) as Part[]);
-  newGoal.parent = thisTuple;
+  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple) as Part[], thisTuple);
 
   const newGoals = [];
   newGoals[0] = newGoal;
@@ -902,14 +894,14 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
 
   /*
         print("Debug: anslist = [");
-            for (var j = 0; j < anslist.length; j++) {
+            for (let j = 0; j < anslist.length; j++) {
                 anslist[j].print();
                 print(", ");
             }
         print("]\n");
         */
 
-  for (var i = anslist.length; i > 0; i--) answers = new Tuple(ops.cons, [anslist[i - 1], answers]);
+  for (let i = anslist.length; i > 0; i--) answers = new Tuple(ops.cons, [anslist[i - 1], answers]);
 
   //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
   const env2 = unify(into, answers, env);

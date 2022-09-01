@@ -163,10 +163,12 @@ function unify(x, y, env) {
     // x.type == y.type == Tuple...
     if (x.name != y.name)
         return null; // Ooh, so first-order.
-    if (x.partlist.list.length != y.partlist.list.length)
+    const xs = x.partlist.list;
+    const ys = y.partlist.list;
+    if (xs.length != ys.length)
         return null;
-    for (var i = 0; i < x.partlist.list.length; i++) {
-        env = unify(x.partlist.list[i], y.partlist.list[i], env);
+    for (let i = 0; i < xs.length; i++) {
+        env = unify(xs[i], ys[i], env);
         if (env == null)
             return null;
     }
@@ -186,9 +188,7 @@ function renameVariable(part, level, parent) {
         case "Variable":
             return new Variable(part.name + "." + level);
         case "Tuple":
-            const tuple = new Tuple(part.name, renameVariables(part.partlist.list, level, parent));
-            tuple.parent = parent;
-            return tuple;
+            return new Tuple(part.name, renameVariables(part.partlist.list, level, parent), parent);
     }
 }
 // Return a list of all variables mentioned in a list of Tuples.
@@ -215,19 +215,19 @@ function varNames(parts) {
 }
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
-function answerQuestion(goalList, env, db, level, onReport) {
+function answerQuestion(goals, env, db, level, onReport) {
     //DEBUG: print ("in main prove...\n");
-    if (goalList.length == 0) {
+    if (goals.length == 0) {
         onReport(env);
         //if (!more) return "done";
         return null;
     }
-    // Prove the first tuple in the goallist. We do this by trying to
+    // Prove the first tuple in the goals. We do this by trying to
     // unify that tuple with the rules in our database. For each
     // matching rule, replace the tuple with the body of the matching
     // rule, with appropriate substitutions.
-    // Then prove the new goallist. (recursive call)
-    const thisTuple = goalList[0];
+    // Then prove the new goals. (recursive call)
+    const thisTuple = goals[0];
     //print ("Debug: thistuple = "); thisTuple.print(); print("\n");
     // Do we have a builtin?
     const builtin = db.builtin[thisTuple.name + "/" + thisTuple.partlist.list.length];
@@ -237,8 +237,8 @@ function answerQuestion(goalList, env, db, level, onReport) {
         // Stick the new body list
         let newGoals = [];
         let j;
-        for (j = 1; j < goalList.length; j++)
-            newGoals[j - 1] = goalList[j];
+        for (j = 1; j < goals.length; j++)
+            newGoals[j - 1] = goals[j];
         return builtin(thisTuple, newGoals, env, db, level + 1, onReport);
     }
     for (let i = 0; i < db.length; i++) {
@@ -270,18 +270,18 @@ function answerQuestion(goalList, env, db, level, onReport) {
                 if (rule.body.list[j].excludeThis)
                     newGoals[j].excludeRule = i;
             }
-            for (k = 1; k < goalList.length; k++)
-                newGoals[j++] = goalList[k];
+            for (k = 1; k < goals.length; k++)
+                newGoals[j++] = goals[k];
             const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
             if (ret != null)
                 return ret;
         }
         else {
-            // Just prove the rest of the goallist, recursively.
+            // Just prove the rest of the goals, recursively.
             let newGoals = [];
             let j;
-            for (j = 1; j < goalList.length; j++)
-                newGoals[j - 1] = goalList[j];
+            for (j = 1; j < goals.length; j++)
+                newGoals[j - 1] = goals[j];
             const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
             if (ret != null)
                 return ret;
@@ -316,11 +316,12 @@ class Atom {
     }
 }
 class Tuple {
-    constructor(head, list) {
+    constructor(head, list, parent, excludeThis) {
         this.type = "Tuple";
         this.name = head;
         this.partlist = new Partlist(list);
-        this.parent = this;
+        this.parent = parent || this;
+        this.excludeThis = excludeThis;
     }
     static parse(tk) {
         // Tuple -> [NOTTHIS] id ( optParamList )
@@ -346,9 +347,7 @@ class Tuple {
         const parts = Partlist.parse(tk);
         if (!parts)
             return null;
-        const tuple = new Tuple(name, parts);
-        tuple.excludeThis = notthis;
-        return tuple;
+        return new Tuple(name, parts, undefined, notthis);
     }
     print() {
         const retval = [];
@@ -477,6 +476,19 @@ class Body {
     print() {
         return this.list.map(each => each.print()).join(", ");
     }
+    static parse(tk) {
+        const tuples = [];
+        while (true) {
+            const tuple = Tuple.parse(tk);
+            if (tuple == null)
+                break;
+            tuples.push(tuple);
+            if (tk.current != ",")
+                break;
+            tk = tk.consume();
+        }
+        return tuples.length == 0 ? null : tuples;
+    }
 }
 class Rule {
     constructor(head, bodylist = null, isQuestion = false) {
@@ -492,7 +504,7 @@ class Rule {
     }
     // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
     static parse(tk) {
-        const head = Rule.parseHead(tk);
+        const head = Tuple.parse(tk);
         if (!head)
             return consoleOutError(tk, "syntax error");
         const expected = ["if" /* ops.if */, "?" /* ops.endQuestion */, "." /* ops.endSentence */, "," /* ops.bodyTupleSeparator */];
@@ -511,7 +523,7 @@ class Rule {
                 return new Rule(head, null, true);
             case "if" /* ops.if */:
                 tk = tk.consume();
-                const bodyOfIf = Rule.parseBody(tk);
+                const bodyOfIf = Body.parse(tk);
                 if (tk.current == "." /* ops.endSentence */)
                     tk = tk.consume();
                 else if (tk.type != "eof")
@@ -519,7 +531,7 @@ class Rule {
                 return new Rule(head, bodyOfIf, false);
             case "," /* ops.bodyTupleSeparator */:
                 tk = tk.consume();
-                const bodyContinues = Rule.parseBody(tk);
+                const bodyContinues = Body.parse(tk);
                 if (tk.current == "?" /* ops.endQuestion */)
                     tk.consume();
                 else if (tk.type != "eof")
@@ -528,23 +540,6 @@ class Rule {
             default:
                 return consoleOutError(tk, "expected one of ", expected.join(" "), "  but instead got");
         }
-    }
-    static parseHead(tk) {
-        // A head is simply a tuple. (errors cascade back up)
-        return Tuple.parse(tk);
-    }
-    static parseBody(tk) {
-        const tuples = [];
-        while (true) {
-            const tuple = Tuple.parse(tk);
-            if (tuple == null)
-                break;
-            tuples.push(tuple);
-            if (tk.current != ",")
-                break;
-            tk = tk.consume();
-        }
-        return tuples.length == 0 ? null : tuples;
     }
     print() {
         const retval = [];
@@ -668,10 +663,10 @@ class Tokeniser {
 // compare(First, Second, CmpValue)
 // First, Second must be bound to strings here.
 // CmpValue is bound to -1, 0, 1
-function Comparitor(thisTuple, goalList, environment, db, level, reportFunction) {
+function Comparitor(thisTuple, goals, environment, db, level, onReport) {
     //DEBUG print ("in Comparitor.prove()...\n");
     // Prove the builtin bit, then break out and prove
-    // the remaining goalList.
+    // the remaining goals.
     // if we were intending to have a resumable builtin (one that can return
     // multiple bindings) then we'd wrap all of this in a while() loop.
     // Rename the variables in the head and body
@@ -696,20 +691,20 @@ function Comparitor(thisTuple, goalList, environment, db, level, reportFunction)
         //print("Debug: Comparitor cannot unify CmpValue with " + cmp + ", failing\n");
         return null;
     }
-    // Just prove the rest of the goallist, recursively.
-    return answerQuestion(goalList, env2, db, level + 1, reportFunction);
+    // Just prove the rest of the goals, recursively.
+    return answerQuestion(goals, env2, db, level + 1, onReport);
 }
-function Commit(thisTuple, goalList, environment, db, level, reportFunction) {
+function Commit(thisTuple, goals, environment, db, level, onReport) {
     //DEBUG print ("in Comparitor.prove()...\n");
     // Prove the builtin bit, then break out and prove
-    // the remaining goalList.
+    // the remaining goals.
     // if we were intending to have a resumable builtin (one that can return
     // multiple bindings) then we'd wrap all of this in a while() loop.
     // Rename the variables in the head and body
     // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
     // On the way through, we do nothing...
-    // Just prove the rest of the goallist, recursively.
-    const ret = answerQuestion(goalList, environment, db, level + 1, reportFunction);
+    // Just prove the rest of the goals, recursively.
+    const ret = answerQuestion(goals, environment, db, level + 1, onReport);
     // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
     //print ("Debug: backtracking through commit/0: thisTuple.parent = "); thisTuple.parent.print(); print("\n");
     thisTuple.parent.commit = true;
@@ -718,7 +713,7 @@ function Commit(thisTuple, goalList, environment, db, level, reportFunction) {
 // Given a single argument, it sticks it on the goal list.
 function Call(thisTuple, goals, env, db, level, onReport) {
     // Prove the builtin bit, then break out and prove
-    // the remaining goalList.
+    // the remaining goals.
     // Rename the variables in the head and body
     // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
     const first = value(thisTuple.partlist.list[0], env);
@@ -728,14 +723,14 @@ function Call(thisTuple, goals, env, db, level, onReport) {
     }
     //var newGoal = new Tuple(first.name, renameVariables(first.partlist.list, level, thisTuple));
     //newGoal.parent = thisTuple;
-    // Stick this as a new goal on the start of the goallist
+    // Stick this as a new goal on the start of the goals
     const newGoals = [];
     newGoals[0] = first;
     first.parent = thisTuple;
     let j;
     for (j = 0; j < goals.length; j++)
         newGoals[j + 1] = goals[j];
-    // Just prove the rest of the goallist, recursively.
+    // Just prove the rest of the goals, recursively.
     return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 function Fail(thisTuple, goals, env, db, level, onReport) {
@@ -747,8 +742,7 @@ function BagOf(thisTuple, goals, env, db, level, onReport) {
     const subgoal = value(thisTuple.partlist.list[1], env);
     const into = value(thisTuple.partlist.list[2], env);
     collect = renameVariables(collect, level, thisTuple);
-    const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple));
-    newGoal.parent = thisTuple;
+    const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple), thisTuple);
     const newGoals = [];
     newGoals[0] = newGoal;
     // Prove this subgoal, collecting up the environments...
@@ -760,13 +754,13 @@ function BagOf(thisTuple, goals, env, db, level, onReport) {
     let answers = new Atom("nothing" /* ops.nothing */);
     /*
           print("Debug: anslist = [");
-              for (var j = 0; j < anslist.length; j++) {
+              for (let j = 0; j < anslist.length; j++) {
                   anslist[j].print();
                   print(", ");
               }
           print("]\n");
           */
-    for (var i = anslist.length; i > 0; i--)
+    for (let i = anslist.length; i > 0; i--)
         answers = new Tuple("cons" /* ops.cons */, [anslist[i - 1], answers]);
     //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
     const env2 = unify(into, answers, env);
@@ -774,10 +768,10 @@ function BagOf(thisTuple, goals, env, db, level, onReport) {
         //print("Debug: bagof cannot unify anslist with "); into.print(); print(", failing\n");
         return null;
     }
-    // Just prove the rest of the goallist, recursively.
+    // Just prove the rest of the goals, recursively.
     return answerQuestion(goals, env2, db, level + 1, onReport);
 }
-// Aux function: return the reportFunction to use with a bagof subgoal
+// Aux function: return the onReport to use with a bagof subgoal
 function BagOfCollectFunction(collect, anslist) {
     return function (env) {
         /*
@@ -845,7 +839,7 @@ function ExternalJS(thisTuple, goals, env, db, level, onReport) {
         //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
         return null;
     }
-    // Just prove the rest of the goallist, recursively.
+    // Just prove the rest of the goals, recursively.
     return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 function ExternalAndParse(thisTuple, goals, env, db, level, onReport) {
@@ -898,7 +892,7 @@ function ExternalAndParse(thisTuple, goals, env, db, level, onReport) {
         //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
         return null;
     }
-    // Just prove the rest of the goallist, recursively.
+    // Just prove the rest of the goals, recursively.
     return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 // run program
