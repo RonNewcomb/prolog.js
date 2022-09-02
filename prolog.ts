@@ -403,22 +403,38 @@ class Tuple {
     this.willExcludeRule = excludeThis;
   }
 
-  static parse(tk: Tokeniser): Tuple | null {
-    // Tuple -> [NOTTHIS] id ( optParamList )
-
-    if ([ops.cutCommit, ops.failRollback].includes(tk.current as ops)) {
-      // Parse commit/rollback as bareword since they control the engine
-      tk = tk.consume();
-      return new Tuple(ops.cutCommit, []);
-    }
-
-    let willExclude = tk.current == ops.notThis;
+  static parseAtTopLevel(tk: Tokeniser): Tuple | null {
+    const willExclude = tk.current == ops.notThis;
     if (willExclude) tk = tk.consume();
 
-    const tuple = Partlist.parseTuple(tk);
-    if (tuple == null) return null;
-    tuple.willExcludeRule = willExclude;
+    // Parse commit/rollback as bareword since they control the engine
+    if ([ops.cutCommit, ops.failRollback].includes(tk.current as ops)) {
+      const op = tk.current;
+      tk = tk.consume();
+      return new Tuple(op, []);
+    }
+
+    const tuple = Tuple.parse(tk);
+    if (tuple) tuple.willExcludeRule = willExclude;
     return tuple;
+  }
+
+  static parse(tk: Tokeniser): Tuple | null {
+    // [
+    tk = tk.consume();
+
+    // symbol/vam/number/string/bareword
+    const name = tk.current;
+    tk = tk.consume();
+
+    //   ,  or  ]
+    if (tk.current == ",") tk = tk.consume();
+    else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
+
+    // while not ] parse items
+    const parts = Partlist.parse(tk);
+    if (!parts) return null;
+    return new Tuple(name, parts);
   }
 
   print(): string {
@@ -505,26 +521,8 @@ class Partlist {
         break;
     }
     if (tk.current == ops.openList) return Partlist.parseDestructuredList(tk);
-    if (tk.current == ops.open) return Partlist.parseTuple(tk);
+    if (tk.current == ops.open) return Tuple.parse(tk);
     return consoleOutError(tk, "expected a ", ops.open, "or", ops.openList, "here");
-  }
-
-  static parseTuple(tk: Tokeniser): Tuple | null {
-    // [
-    tk = tk.consume();
-
-    // symbol/vam/number/string/bareword
-    const name = tk.current;
-    tk = tk.consume();
-
-    //   ,  or  ]
-    if (tk.current == ",") tk = tk.consume();
-    else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
-
-    // while not ] parse items
-    const parts = Partlist.parse(tk);
-    if (!parts) return null;
-    return new Tuple(name, parts);
   }
 
   static parseDestructuredList(tk: Tokeniser): TupleItem | null {
@@ -630,7 +628,7 @@ class Rule {
   static parseBody(tk: Tokeniser): Tuple[] | null {
     const tuples: Tuple[] = [];
     while (true) {
-      const tuple = Tuple.parse(tk);
+      const tuple = Tuple.parseAtTopLevel(tk);
       if (tuple == null) break;
       tuples.push(tuple);
       if (tk.current != ",") break;

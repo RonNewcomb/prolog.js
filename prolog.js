@@ -323,21 +323,37 @@ class Tuple {
         this.parent = parent || this;
         this.willExcludeRule = excludeThis;
     }
-    static parse(tk) {
-        // Tuple -> [NOTTHIS] id ( optParamList )
-        if (["commit" /* ops.cutCommit */, "rollback" /* ops.failRollback */].includes(tk.current)) {
-            // Parse commit/rollback as bareword since they control the engine
-            tk = tk.consume();
-            return new Tuple("commit" /* ops.cutCommit */, []);
-        }
-        let willExclude = tk.current == "NOTTHIS" /* ops.notThis */;
+    static parseAtTopLevel(tk) {
+        const willExclude = tk.current == "NOTTHIS" /* ops.notThis */;
         if (willExclude)
             tk = tk.consume();
-        const tuple = Partlist.parseTuple(tk);
-        if (tuple == null)
-            return null;
-        tuple.willExcludeRule = willExclude;
+        // Parse commit/rollback as bareword since they control the engine
+        if (["commit" /* ops.cutCommit */, "rollback" /* ops.failRollback */].includes(tk.current)) {
+            const op = tk.current;
+            tk = tk.consume();
+            return new Tuple(op, []);
+        }
+        const tuple = Tuple.parse(tk);
+        if (tuple)
+            tuple.willExcludeRule = willExclude;
         return tuple;
+    }
+    static parse(tk) {
+        // [
+        tk = tk.consume();
+        // symbol/vam/number/string/bareword
+        const name = tk.current;
+        tk = tk.consume();
+        //   ,  or  ]
+        if (tk.current == ",")
+            tk = tk.consume();
+        else if (tk.current != "]")
+            return consoleOutError(tk, "expected , or ] after first tuple");
+        // while not ] parse items
+        const parts = Partlist.parse(tk);
+        if (!parts)
+            return null;
+        return new Tuple(name, parts);
     }
     print() {
         const retval = [];
@@ -417,25 +433,8 @@ class Partlist {
         if (tk.current == "{" /* ops.openList */)
             return Partlist.parseDestructuredList(tk);
         if (tk.current == "[" /* ops.open */)
-            return Partlist.parseTuple(tk);
+            return Tuple.parse(tk);
         return consoleOutError(tk, "expected a ", "[" /* ops.open */, "or", "{" /* ops.openList */, "here");
-    }
-    static parseTuple(tk) {
-        // [
-        tk = tk.consume();
-        // symbol/vam/number/string/bareword
-        const name = tk.current;
-        tk = tk.consume();
-        //   ,  or  ]
-        if (tk.current == ",")
-            tk = tk.consume();
-        else if (tk.current != "]")
-            return consoleOutError(tk, "expected , or ] after first tuple");
-        // while not ] parse items
-        const parts = Partlist.parse(tk);
-        if (!parts)
-            return null;
-        return new Tuple(name, parts);
     }
     static parseDestructuredList(tk) {
         // list destructure?  parse & return
@@ -534,7 +533,7 @@ class Rule {
     static parseBody(tk) {
         const tuples = [];
         while (true) {
-            const tuple = Tuple.parse(tk);
+            const tuple = Tuple.parseAtTopLevel(tk);
             if (tuple == null)
                 break;
             tuples.push(tuple);
