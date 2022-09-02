@@ -410,14 +410,28 @@ class Partlist {
     static parse1(tk) {
         // Part -> var | id | id(optParamList)
         // Part -> [ listBit ] ::-> cons(...)
-        // var?  parse & return
-        if (tk.type == "var") {
-            const varName = tk.current;
-            tk = tk.consume();
-            return new Variable(varName);
+        switch (tk.type) {
+            // var?  parse & return
+            case "var":
+                const varName = tk.current;
+                tk = tk.consume();
+                return new Variable(varName);
+            // bareword? atom?  parse & return
+            case "id":
+                const symbolName = tk.current;
+                tk = tk.consume();
+                return new Atom(symbolName);
+            case "eof":
+                return consoleOutError(tk, "unexpected end of input");
+            default:
+                return consoleOutError(tk, "expected a ", "[" /* ops.open */, "or", "{" /* ops.openList */, "here");
+            case "punc":
+                if (!["{" /* ops.openList */, "[" /* ops.open */].includes(tk.current))
+                    return consoleOutError(tk, "expected a ", "[" /* ops.open */, "or", "{" /* ops.openList */, "here");
+                break;
         }
         // list destructure?  parse & return
-        if (tk.type == "punc" && tk.current == "{" /* ops.openList */) {
+        if (tk.current == "{" /* ops.openList */) {
             tk = tk.consume();
             // Special case: {} = new atom(nothing).
             if (tk.type == "punc" && tk.current == "}" /* ops.closeList */) {
@@ -455,20 +469,16 @@ class Partlist {
                 append = new Tuple("cons" /* ops.cons */, [parts[i], append]);
             return append;
         }
-        // sub-tuple starts?
-        const openbracket = tk.type == "punc" && tk.current == "[" /* ops.open */;
-        if (openbracket)
-            tk = tk.consume();
-        // bareword or first item in sub-tuple
+        // [
+        tk = tk.consume();
+        // symbol/vam/number/string/bareword
         const name = tk.current;
         tk = tk.consume();
-        // bareword.  return.
-        if (!openbracket)
-            return new Atom(name);
-        // ,
-        if (tk.current != ",")
-            return consoleOutError(tk, "expected , after symbol");
-        tk = tk.consume();
+        //   ,  or  ]
+        if (tk.current == ",")
+            tk = tk.consume();
+        else if (tk.current != "]")
+            return consoleOutError(tk, "expected , or ] after first tuple");
         // while not ] parse items
         const parts = Partlist.parse(tk);
         if (!parts)
