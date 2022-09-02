@@ -10,9 +10,6 @@ interface Document {
 
 type Database = Rule[] & { builtin?: { [key: string]: Functor } };
 type FunctorResult = null | boolean;
-interface Environment {
-  [name: string]: TupleItem;
-}
 interface ReportFunction {
   (env: Environment): void;
 }
@@ -138,9 +135,9 @@ function nextline(line: string): Database {
     let reported = false;
     const reportFn = (env: Environment) => {
       reported = true;
-      Environments.printBindings(rule.body!, env);
+      env.printBindings(rule.body!);
     };
-    answerQuestion(renameVariables(rule.body!, 0) as Tuple[], {} as Environment, database, 1, reportFn);
+    answerQuestion(renameVariables(rule.body!, 0) as Tuple[], new Environment(), database, 1, reportFn);
     if (!reported) printAnswerline("No.\n");
   } else {
     database.push(rule);
@@ -151,17 +148,29 @@ function nextline(line: string): Database {
 
 // environment ///////
 
-class Environments {
-  contents: Environment;
+class Environment {
+  contents: {
+    [name: string]: TupleItem;
+  };
 
-  constructor(env: Environment) {
-    this.contents = env;
+  constructor() {
+    this.contents = {};
+  }
+
+  // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
+  spawn(name: string, part: TupleItem): Environment {
+    // We assume that name has been 'unwound' or 'followed' as far as possible
+    // in the environment. If this is not the case, we could get an alias loop.
+    const newEnv = new Environment();
+    newEnv.contents[name] = part;
+    for (const othername in this.contents) if (othername != name) newEnv.contents[othername] = this.contents[othername];
+    return newEnv;
   }
 
   // Print out an environment's contents.
-  static printEnv(env?: Environment) {
-    if (!env) return printAnswerline("Empty.\n");
-    const retval: string[] = Object.entries(env).map(([name, part]) => ` ${name} = ${part.print()}\n`);
+  print() {
+    if (!this.contents) return printAnswerline("Empty.\n");
+    const retval: string[] = Object.entries(this.contents).map(([name, part]) => ` ${name} = ${part.print()}\n`);
     printAnswerline(retval.length ? retval.join("") : "Empty.\n");
   }
 
@@ -176,7 +185,7 @@ class Environments {
           if (!variables.find(o => o.name == part.name)) variables.push(part);
           continue;
         case "Tuple":
-          const nestedVariables = Environments.varNames(part.items);
+          const nestedVariables = Environment.varNames(part.items);
           for (const nestedVariable of nestedVariables) {
             if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
           }
@@ -186,8 +195,8 @@ class Environments {
     return variables;
   }
 
-  static printBindings(tuples: Tuple[], environment: Environment): void {
-    const variables = Environments.varNames(tuples);
+  printBindings(tuples: Tuple[]): void {
+    const variables = Environment.varNames(tuples);
     if (variables.length == 0) return printAnswerline("Yes.\n\n");
 
     const retval: string[] = [];
@@ -198,7 +207,7 @@ class Environments {
         retval.push(" is ");
       }
       const topLevelVarName = variable.name + ".0";
-      const part = Environments.value(new Variable(topLevelVarName), environment);
+      const part = this.value(new Variable(topLevelVarName));
       retval.push(part.name == topLevelVarName ? ops.anything : part.print());
       retval.push(".\n");
     }
@@ -207,39 +216,29 @@ class Environments {
   }
 
   // The value of x in a given environment
-  static value(x: TupleItem, env: Environment): TupleItem {
+  value(x: TupleItem): TupleItem {
     switch (x.type) {
       case "Tuple":
-        const parts = x.items.map(each => Environments.value(each, env));
+        const parts = x.items.map(each => this.value(each));
         return new Tuple(x.name, parts);
       case "Atom":
         return x; // We only need to check the values of variables...
       case "Variable":
-        const binding = env[x.name];
-        return binding == null ? x : Environments.value(binding, env);
+        const binding = this.contents[x.name];
+        return binding == null ? x : this.value(binding);
     }
-  }
-
-  // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
-  static newEnv(name: string, part: TupleItem, oldEnv: Environment): Environment {
-    // We assume that name has been 'unwound' or 'followed' as far as possible
-    // in the environment. If this is not the case, we could get an alias loop.
-    const newEnv = {} as Environment;
-    newEnv[name] = part;
-    for (const othername in oldEnv) if (othername != name) newEnv[othername] = oldEnv[othername];
-    return newEnv;
   }
 
   // More substantial utility functions.
 
   // Unify two tuples in the current environment. Returns a new environment.
   // On failure, returns null.
-  static unify(x: TupleItem, y: TupleItem, env: Environment): Environment | null {
-    x = Environments.value(x, env);
-    y = Environments.value(y, env);
-    if (x.type == "Variable") return Environments.newEnv(x.name, y, env);
-    if (y.type == "Variable") return Environments.newEnv(y.name, x, env);
-    if (x.type == "Atom" || y.type == "Atom") return x.type == y.type && x.name == y.name ? env : null;
+  unify(x: TupleItem, y: TupleItem): Environment | null {
+    x = this.value(x);
+    y = this.value(y);
+    if (x.type == "Variable") return this.spawn(x.name, y);
+    if (y.type == "Variable") return this.spawn(y.name, x);
+    if (x.type == "Atom" || y.type == "Atom") return x.type == y.type && x.name == y.name ? this : null;
 
     // x.type == y.type == Tuple...
     if (x.name != y.name) return null; // Ooh, so first-order.
@@ -247,8 +246,9 @@ class Environments {
     const ys = y.items;
     if (xs.length != ys.length) return null;
 
+    let env: Environment | null = this;
     for (let i = 0; i < xs.length; i++) {
-      env = Environments.unify(xs[i], ys[i], env)!;
+      env = env.unify(xs[i], ys[i]);
       if (env == null) return null;
     }
 
@@ -324,7 +324,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, thisTuple));
     // renamedHead.ruleNumber = i;
 
-    const env2 = Environments.unify(thisTuple, renamedHead, env);
+    const env2 = env.unify(thisTuple, renamedHead);
     if (env2 == null) continue;
 
     if (rule.body != null) {
@@ -777,13 +777,13 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   // Rename the variables in the head and body
   // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
-  const first = Environments.value(thisTuple.items[0], environment);
+  const first = environment.value(thisTuple.items[0]);
   if (first.type != "Atom") {
     //print("Debug: Comparitor needs First bound to an Atom, failing\n");
     return null;
   }
 
-  const second = Environments.value(thisTuple.items[1], environment);
+  const second = environment.value(thisTuple.items[1]);
   if (second.type != "Atom") {
     //print("Debug: Comparitor needs Second bound to an Atom, failing\n");
     return null;
@@ -793,7 +793,7 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   if (first.name < second.name) cmp = "lt";
   else if (first.name > second.name) cmp = "gt";
 
-  const env2 = Environments.unify(thisTuple.items[2], new Atom(cmp), environment);
+  const env2 = environment.unify(thisTuple.items[2], new Atom(cmp));
 
   if (env2 == null) {
     //print("Debug: Comparitor cannot unify CmpValue with " + cmp + ", failing\n");
@@ -835,7 +835,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   // Rename the variables in the head and body
   // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
-  const first: TupleItem = Environments.value(thisTuple.items[0], env);
+  const first: TupleItem = env.value(thisTuple.items[0]);
   if (first.type != "Tuple") {
     //print("Debug: Call needs parameter bound to a Tuple, failing\n");
     return null;
@@ -865,9 +865,9 @@ type AnswerList = TupleItem[] & { renumber?: number };
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // bagof(Tuple, ConditionTuple, ReturnList)
 
-  let collect: TupleItem = Environments.value(thisTuple.items[0], env);
-  const subgoal = Environments.value(thisTuple.items[1], env) as Tuple;
-  const into = Environments.value(thisTuple.items[2], env);
+  let collect: TupleItem = env.value(thisTuple.items[0]);
+  const subgoal = env.value(thisTuple.items[1]) as Tuple;
+  const into = env.value(thisTuple.items[2]);
 
   collect = renameVariable(collect, level, thisTuple);
   const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple);
@@ -897,7 +897,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   for (let i = anslist.length; i > 0; i--) answers = new Tuple(ops.cons, [anslist[i - 1], answers]);
 
   //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
-  const env2 = Environments.unify(into, answers, env);
+  const env2 = env.unify(into, answers);
 
   if (env2 == null) {
     //print("Debug: bagof cannot unify anslist with "); into.print(); print(", failing\n");
@@ -921,7 +921,7 @@ function BagOfCollectFunction(collect: TupleItem, anslist: AnswerList): ReportFu
                 printEnv(env);
                 */
     // Rename this appropriately and throw it into anslist
-    anslist[anslist.length] = renameVariable(Environments.value(collect, env), anslist.renumber!--) as TupleItem;
+    anslist[anslist.length] = renameVariable(env.value(collect), anslist.renumber!--) as TupleItem;
   };
 }
 
@@ -934,7 +934,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   //print ("DEBUG: in External...\n");
 
   // Get the first tuple, the template.
-  const first = Environments.value(thisTuple.items[0], env);
+  const first = env.value(thisTuple.items[0]);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -946,11 +946,11 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: TupleItem = Environments.value(thisTuple.items[1], env);
+  let second: TupleItem = env.value(thisTuple.items[1]);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = Environments.value(second.items[0], env);
+    const arg = env.value(second.items[0]);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -978,7 +978,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   if (!ret) ret = ops.nothing;
 
   // Convert back into an atom...
-  const env2 = Environments.unify(thisTuple.items[2], new Atom(ret), env);
+  const env2 = env.unify(thisTuple.items[2], new Atom(ret));
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
@@ -993,7 +993,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   //print ("DEBUG: in External...\n");
 
   // Get the first tuple, the template.
-  const first = Environments.value(thisTuple.items[0], env);
+  const first = env.value(thisTuple.items[0]);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -1005,11 +1005,11 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: TupleItem = Environments.value(thisTuple.items[1], env);
+  let second: TupleItem = env.value(thisTuple.items[1]);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = Environments.value((second as Tuple).items[0], env);
+    const arg = env.value(second.items[0]);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -1018,7 +1018,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
     //print("DEBUG: External/3: RegExp is "+re+", arg is "+arg.name+"\n");
     r = r.replace(re, arg.name);
     //print("DEBUG: External/3: r becomes "+r+"\n");
-    second = (second as Tuple).items[1];
+    second = second.items[1];
     i++;
   }
   if (second.type != "Atom" || second.name != ops.nothing) {
@@ -1040,7 +1040,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   const part = Tuple.parseItem(new Tokeniser(ret));
   //print("DEBUG: external2, ret = "); ret.print(); print(".\n");
 
-  const env2 = Environments.unify(thisTuple.items[2], part!, env);
+  const env2 = env.unify(thisTuple.items[2], part!);
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
