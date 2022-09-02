@@ -37,6 +37,7 @@ const enum ops {
   bodyTupleSeparator = ",",
   paramSeparator = ",",
   cutCommit = "commit",
+  failRollback = "rollback",
   nothing = "nothing",
   anything = "anything",
   notThis = "NOTTHIS",
@@ -405,8 +406,8 @@ class Tuple {
   static parse(tk: Tokeniser): Tuple | null {
     // Tuple -> [NOTTHIS] id ( optParamList )
 
-    if (/*tk.type == "id" && */ tk.current == ops.cutCommit) {
-      // Parse bareword commit as commit/0
+    if ([ops.cutCommit, ops.failRollback].includes(tk.current as ops)) {
+      // Parse commit/rollback as bareword since they control the engine
       tk = tk.consume();
       return new Tuple(ops.cutCommit, []);
     }
@@ -414,23 +415,10 @@ class Tuple {
     let willExclude = tk.current == ops.notThis;
     if (willExclude) tk = tk.consume();
 
-    //  [
-    if (tk.type != "punc" || tk.current != ops.open) return consoleOutError(tk, "expected [ to begin");
-    tk = tk.consume();
-
-    //  symbol/var/number/string
-    if (tk.type != "id") return consoleOutError(tk, "expected first item after [ to be a symbol / bare word");
-    const name = tk.current;
-    tk = tk.consume();
-
-    //   ,  or  ]
-    if (tk.current == ",") tk = tk.consume();
-    else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
-
-    //  while not ]  parse items
-    const parts = Partlist.parse(tk);
-    if (!parts) return null;
-    return new Tuple(name!, parts, undefined, willExclude);
+    const tuple = Partlist.parseTuple(tk);
+    if (tuple == null) return null;
+    tuple.willExcludeRule = willExclude;
+    return tuple;
   }
 
   print(): string {
@@ -514,47 +502,14 @@ class Partlist {
         return consoleOutError(tk, "expected a ", ops.open, "or", ops.openList, "here");
 
       case "punc":
-        if (![ops.openList, ops.open].includes(tk.current as ops)) return consoleOutError(tk, "expected a ", ops.open, "or", ops.openList, "here");
         break;
     }
+    if (tk.current == ops.openList) return Partlist.parseDestructuredList(tk);
+    if (tk.current == ops.open) return Partlist.parseTuple(tk);
+    return consoleOutError(tk, "expected a ", ops.open, "or", ops.openList, "here");
+  }
 
-    // list destructure?  parse & return
-    if (tk.current == ops.openList) {
-      tk = tk.consume();
-
-      // Special case: {} = new atom(nothing).
-      if (tk.type == "punc" && tk.current == ops.closeList) {
-        tk = tk.consume();
-        return new Atom(ops.nothing);
-      }
-
-      // Get a list of parts
-      const parts = [];
-      while (true) {
-        const part = Partlist.parse1(tk);
-        if (part == null) return consoleOutError(tk, "can't understand this part of a list destructuring");
-        parts.push(part);
-        if (tk.current != ",") break;
-        tk = tk.consume();
-      }
-
-      // Find the end of the list ... "| Var }" or "}".
-      let append: TupleItem;
-      if (tk.current == ops.sliceList) {
-        tk = tk.consume();
-        if (tk.type != "var") return consoleOutError(tk, ops.sliceList, " wasn't followed by a var");
-        append = new Variable(tk.current!);
-        tk = tk.consume();
-      } else {
-        append = new Atom(ops.nothing);
-      }
-      if (tk.current != ops.closeList) return consoleOutError(tk, "list destructure wasn't ended by }");
-      tk = tk.consume();
-      // Return the new cons.... of all this rubbish.
-      for (let i = parts.length - 1; i >= 0; i--) append = new Tuple(ops.cons, [parts[i], append]);
-      return append;
-    }
-
+  static parseTuple(tk: Tokeniser): Tuple | null {
     // [
     tk = tk.consume();
 
@@ -570,6 +525,43 @@ class Partlist {
     const parts = Partlist.parse(tk);
     if (!parts) return null;
     return new Tuple(name, parts);
+  }
+
+  static parseDestructuredList(tk: Tokeniser): TupleItem | null {
+    // list destructure?  parse & return
+    tk = tk.consume();
+
+    // Special case: {} = new atom(nothing).
+    if (tk.type == "punc" && tk.current == ops.closeList) {
+      tk = tk.consume();
+      return new Atom(ops.nothing);
+    }
+
+    // Get a list of parts
+    const parts = [];
+    while (true) {
+      const part = Partlist.parse1(tk);
+      if (part == null) return consoleOutError(tk, "can't understand this part of a list destructuring");
+      parts.push(part);
+      if (tk.current != ",") break;
+      tk = tk.consume();
+    }
+
+    // Find the end of the list ... "| Var }" or "}".
+    let append: TupleItem;
+    if (tk.current == ops.sliceList) {
+      tk = tk.consume();
+      if (tk.type != "var") return consoleOutError(tk, ops.sliceList, " wasn't followed by a var");
+      append = new Variable(tk.current!);
+      tk = tk.consume();
+    } else {
+      append = new Atom(ops.nothing);
+    }
+    if (tk.current != ops.closeList) return consoleOutError(tk, "list destructure wasn't ended by }");
+    tk = tk.consume();
+    // Return the new cons.... of all this rubbish.
+    for (let i = parts.length - 1; i >= 0; i--) append = new Tuple(ops.cons, [parts[i], append]);
+    return append;
   }
 
   print(): string {
