@@ -182,7 +182,7 @@ function printVars(variables: Variable[], environment: Environment): void {
 function value(x: TupleItem, env: Environment): TupleItem {
   switch (x.type) {
     case "Tuple":
-      const parts = x.partlist.list.map(each => value(each, env));
+      const parts = x.items.map(each => value(each, env));
       return new Tuple(x.name, parts);
     case "Atom":
       return x; // We only need to check the values of variables...
@@ -215,8 +215,8 @@ function unify(x: TupleItem, y: TupleItem, env: Environment): Environment | null
 
   // x.type == y.type == Tuple...
   if (x.name != y.name) return null; // Ooh, so first-order.
-  const xs = x.partlist.list;
-  const ys = y.partlist.list;
+  const xs = x.items;
+  const ys = y.items;
   if (xs.length != ys.length) return null;
 
   for (let i = 0; i < xs.length; i++) {
@@ -241,7 +241,7 @@ function renameVariable(part: TupleItem, level: number, parent?: Tuple): TupleIt
     case "Variable":
       return new Variable(part.name + "." + level);
     case "Tuple":
-      return new Tuple(part.name, renameVariables(part.partlist.list, level, parent), parent);
+      return new Tuple(part.name, renameVariables(part.items, level, parent), parent);
   }
 }
 
@@ -256,7 +256,7 @@ function varNames(parts: TupleItem[]): Variable[] {
         if (!variables.find(o => o.name == part.name)) variables.push(part);
         continue;
       case "Tuple":
-        const nestedVariables = varNames(part.partlist.list);
+        const nestedVariables = varNames(part.items);
         for (const nestedVariable of nestedVariables) {
           if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
         }
@@ -286,8 +286,8 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
   //print ("Debug: thistuple = "); thisTuple.print(); print("\n");
 
   // Do we have a builtin?
-  const builtin = db.builtin![thisTuple.name + "/" + thisTuple.partlist.list.length];
-  // print ("Debug: searching for builtin "+thisTuple.name+"/"+thisTuple.partlist.list.length+"\n");
+  const builtin = db.builtin![thisTuple.name + "/" + thisTuple.items.length];
+  // print ("Debug: searching for builtin "+thisTuple.name+"/"+thisTuple.items.list.length+"\n");
   if (builtin) {
     //print ("builtin with name " + thisTuple.name + " found; calling prove() on it...\n");
     // Stick the new body list
@@ -313,7 +313,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     }
 
     // Rename the variables in the head and body
-    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level, thisTuple));
+    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, thisTuple));
     // renamedHead.ruleNumber = i;
 
     const env2 = unify(thisTuple, renamedHead, env);
@@ -390,7 +390,7 @@ class Atom {
 class Tuple {
   type: "Tuple" = "Tuple";
   name: string;
-  partlist: Partlist;
+  items: TupleItem[];
   willExcludeRule?: boolean;
   excludeRule?: number;
   parent: Tuple;
@@ -398,7 +398,7 @@ class Tuple {
 
   constructor(head: string, list: TupleItem[], parent?: Tuple, excludeThis?: boolean) {
     this.name = head;
-    this.partlist = new Partlist(list);
+    this.items = list;
     this.parent = parent || this;
     this.willExcludeRule = excludeThis;
   }
@@ -432,7 +432,7 @@ class Tuple {
     else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
 
     // while not ] parse items
-    const parts = Partlist.parse(tk);
+    const parts = Tuple.parseItems(tk);
     if (!parts) return null;
     return new Tuple(name, parts);
   }
@@ -441,18 +441,18 @@ class Tuple {
     const retval: string[] = [];
     if (this.name == ops.cons) {
       let part: TupleItem = this;
-      while (part.type == "Tuple" && part.name == ops.cons && part.partlist.list.length == 2) {
-        part = part.partlist.list[1];
+      while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 2) {
+        part = part.items[1];
       }
       if ((part.type == "Atom" && part.name == ops.nothing) || part.type == "Variable") {
         part = this;
         retval.push(ops.openList);
         let comma = false;
-        while (part.type == "Tuple" && part.name == ops.cons && part.partlist.list.length == 2) {
+        while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 2) {
           if (comma) retval.push(", ");
-          retval.push(part.partlist.list[0].print());
+          retval.push(part.items[0].print());
           comma = true;
-          part = part.partlist.list[1];
+          part = part.items[1];
         }
         if (part.type == "Variable") {
           retval.push(" " + ops.sliceList + " ");
@@ -463,25 +463,17 @@ class Tuple {
       }
     }
     retval.push(ops.open + this.name);
-    retval.push(this.partlist.print());
+    retval.push(this.items.map(each => ", " + each.print()).join(""));
     retval.push(ops.close);
     return retval.join("");
   }
-}
 
-class Partlist {
-  list: TupleItem[];
-
-  constructor(list: TupleItem[]) {
-    this.list = list;
-  }
-
-  static parse(tk: Tokeniser): TupleItem[] | null {
+  static parseItems(tk: Tokeniser): TupleItem[] | null {
     const parts: TupleItem[] = [];
     while (tk.current != ops.close) {
       if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tuples until", ops.close);
 
-      const part = Partlist.parse1(tk);
+      const part = Tuple.parseItem(tk);
       if (part == null) return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
       parts.push(part);
 
@@ -494,7 +486,7 @@ class Partlist {
   }
 
   // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
-  static parse1(tk: Tokeniser): TupleItem | null {
+  static parseItem(tk: Tokeniser): TupleItem | null {
     // Part -> var | id | id(optParamList)
     // Part -> [ listBit ] ::-> cons(...)
 
@@ -520,7 +512,7 @@ class Partlist {
       case "punc":
         break;
     }
-    if (tk.current == ops.openList) return Partlist.parseDestructuredList(tk);
+    if (tk.current == ops.openList) return Tuple.parseDestructuredList(tk);
     if (tk.current == ops.open) return Tuple.parse(tk);
     return consoleOutError(tk, "expected a ", ops.open, "or", ops.openList, "here");
   }
@@ -538,7 +530,7 @@ class Partlist {
     // Get a list of parts
     const parts = [];
     while (true) {
-      const part = Partlist.parse1(tk);
+      const part = Tuple.parseItem(tk);
       if (part == null) return consoleOutError(tk, "can't understand this part of a list destructuring");
       parts.push(part);
       if (tk.current != ",") break;
@@ -560,10 +552,6 @@ class Partlist {
     // Return the new cons.... of all this rubbish.
     for (let i = parts.length - 1; i >= 0; i--) append = new Tuple(ops.cons, [parts[i], append]);
     return append;
-  }
-
-  print(): string {
-    return this.list.map(each => ", " + each.print()).join("");
   }
 }
 
@@ -655,7 +643,7 @@ function hasTheImpliedUnboundVar(tuple: TupleItem): boolean {
     case "Variable":
       return tuple.name === ops.impliedQuestionVar;
     case "Tuple":
-      return tuple.partlist.list.some(hasTheImpliedUnboundVar);
+      return tuple.items.some(hasTheImpliedUnboundVar);
   }
 }
 
@@ -780,15 +768,15 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   // multiple bindings) then we'd wrap all of this in a while() loop.
 
   // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
+  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
-  const first = value(thisTuple.partlist.list[0], environment);
+  const first = value(thisTuple.items[0], environment);
   if (first.type != "Atom") {
     //print("Debug: Comparitor needs First bound to an Atom, failing\n");
     return null;
   }
 
-  const second = value(thisTuple.partlist.list[1], environment);
+  const second = value(thisTuple.items[1], environment);
   if (second.type != "Atom") {
     //print("Debug: Comparitor needs Second bound to an Atom, failing\n");
     return null;
@@ -798,7 +786,7 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   if (first.name < second.name) cmp = "lt";
   else if (first.name > second.name) cmp = "gt";
 
-  const env2 = unify(thisTuple.partlist.list[2], new Atom(cmp), environment);
+  const env2 = unify(thisTuple.items[2], new Atom(cmp), environment);
 
   if (env2 == null) {
     //print("Debug: Comparitor cannot unify CmpValue with " + cmp + ", failing\n");
@@ -818,7 +806,7 @@ function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: 
   // multiple bindings) then we'd wrap all of this in a while() loop.
 
   // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
+  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
   // On the way through, we do nothing...
 
@@ -838,15 +826,15 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   // the remaining goals.
 
   // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.partlist.list, level));
+  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
-  const first: TupleItem = value(thisTuple.partlist.list[0], env);
+  const first: TupleItem = value(thisTuple.items[0], env);
   if (first.type != "Tuple") {
     //print("Debug: Call needs parameter bound to a Tuple, failing\n");
     return null;
   }
 
-  //var newGoal = new Tuple(first.name, renameVariables(first.partlist.list, level, thisTuple));
+  //var newGoal = new Tuple(first.name, renameVariables(first.items.list, level, thisTuple));
   //newGoal.parent = thisTuple;
 
   // Stick this as a new goal on the start of the goals
@@ -870,12 +858,12 @@ type AnswerList = TupleItem[] & { renumber?: number };
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // bagof(Tuple, ConditionTuple, ReturnList)
 
-  let collect: TupleItem = value(thisTuple.partlist.list[0], env);
-  const subgoal = value(thisTuple.partlist.list[1], env) as Tuple;
-  const into = value(thisTuple.partlist.list[2], env);
+  let collect: TupleItem = value(thisTuple.items[0], env);
+  const subgoal = value(thisTuple.items[1], env) as Tuple;
+  const into = value(thisTuple.items[2], env);
 
   collect = renameVariable(collect, level, thisTuple);
-  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.partlist.list, level, thisTuple), thisTuple);
+  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple);
 
   const newGoals = [];
   newGoals[0] = newGoal;
@@ -939,7 +927,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   //print ("DEBUG: in External...\n");
 
   // Get the first tuple, the template.
-  const first = value(thisTuple.partlist.list[0], env);
+  const first = value(thisTuple.items[0], env);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -951,11 +939,11 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: TupleItem = value(thisTuple.partlist.list[1], env);
+  let second: TupleItem = value(thisTuple.items[1], env);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = value((second as Tuple).partlist.list[0], env);
+    const arg = value((second as Tuple).items[0], env);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -964,7 +952,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
     //print("DEBUG: External/3: RegExp is "+re+", arg is "+arg.name+"\n");
     r = r.replace(re, arg.name);
     //print("DEBUG: External/3: r becomes "+r+"\n");
-    second = (second as Tuple).partlist.list[1];
+    second = (second as Tuple).items[1];
     i++;
   }
   if (second.type != "Atom" || second.name != ops.nothing) {
@@ -983,7 +971,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   if (!ret) ret = ops.nothing;
 
   // Convert back into an atom...
-  const env2 = unify(thisTuple.partlist.list[2], new Atom(ret), env);
+  const env2 = unify(thisTuple.items[2], new Atom(ret), env);
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
@@ -998,7 +986,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   //print ("DEBUG: in External...\n");
 
   // Get the first tuple, the template.
-  const first = value(thisTuple.partlist.list[0], env);
+  const first = value(thisTuple.items[0], env);
   if (first.type != "Atom") {
     //print("Debug: External needs First bound to a string Atom, failing\n");
     return null;
@@ -1010,11 +998,11 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   //print("DEBUG: template for External/3 is "+r+"\n");
 
   // Get the second tuple, the argument list.
-  let second: TupleItem = value(thisTuple.partlist.list[1], env);
+  let second: TupleItem = value(thisTuple.items[1], env);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
-    const arg = value((second as Tuple).partlist.list[0], env);
+    const arg = value((second as Tuple).items[0], env);
     if (arg.type != "Atom") {
       //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
       return null;
@@ -1023,7 +1011,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
     //print("DEBUG: External/3: RegExp is "+re+", arg is "+arg.name+"\n");
     r = r.replace(re, arg.name);
     //print("DEBUG: External/3: r becomes "+r+"\n");
-    second = (second as Tuple).partlist.list[1];
+    second = (second as Tuple).items[1];
     i++;
   }
   if (second.type != "Atom" || second.name != ops.nothing) {
@@ -1042,10 +1030,10 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   if (!ret) ret = ops.nothing;
 
   // Convert back into a Prolog tuple by calling the appropriate Parse routine...
-  const part = Partlist.parse1(new Tokeniser(ret));
+  const part = Tuple.parseItem(new Tokeniser(ret));
   //print("DEBUG: external2, ret = "); ret.print(); print(".\n");
 
-  const env2 = unify(thisTuple.partlist.list[2], part!, env);
+  const env2 = unify(thisTuple.items[2], part!, env);
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
