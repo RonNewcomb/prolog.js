@@ -87,6 +87,7 @@ function nextline(line) {
             reported = true;
             env.printBindings(rule.body);
         };
+        console.log("Asking", line);
         answerQuestion(renameVariables(rule.body, 0), new Environment(), database, 1, reportFn);
         if (!reported)
             printAnswerline("No.\n");
@@ -222,84 +223,49 @@ function renameVariable(part, level, parent) {
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
 function answerQuestion(goals, env, db, level, onReport) {
-    //DEBUG: print ("in main prove...\n");
+    console.log(level, goals, env.contents);
     if (goals.length == 0) {
         onReport(env);
-        //if (!more) return "done";
+        //if (!more) return true;
         return null;
     }
-    // Prove the first tuple in the goals. We do this by trying to
-    // unify that tuple with the rules in our database. For each
-    // matching rule, replace the tuple with the body of the matching
-    // rule, with appropriate substitutions.
-    // Then prove the new goals. (recursive call)
-    const thisTuple = goals[0];
-    //print ("Debug: thistuple = "); thisTuple.print(); print("\n");
+    // Prove the first tuple in the goals. We do this by trying to unify that tuple with the rules in our database. For each
+    // matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
+    // Then prove the new goals recursively.
+    const first = goals[0];
+    const rest = goals.slice(1);
     // Do we have a builtin?
-    const builtin = db.builtin[thisTuple.name + "/" + thisTuple.items.length];
-    // print ("Debug: searching for builtin "+thisTuple.name+"/"+thisTuple.items.list.length+"\n");
-    if (builtin) {
-        //print ("builtin with name " + thisTuple.name + " found; calling prove() on it...\n");
-        // Stick the new body list
-        let newGoals = [];
-        let j;
-        for (j = 1; j < goals.length; j++)
-            newGoals[j - 1] = goals[j];
-        return builtin(thisTuple, newGoals, env, db, level + 1, onReport);
-    }
-    for (let i = 0; i < db.length; i++) {
-        //print ("Debug: in rule selection. thisTuple = "); thisTuple.print(); print ("\n");
-        if (thisTuple.excludeRule == i) {
-            // print("DEBUG: excluding rule number "+i+" in attempt to satisfy "); thisTuple.print(); print("\n");
+    const builtin = db.builtin[first.name + "/" + first.items.length];
+    if (builtin)
+        return builtin(first, rest, env, db, level + 1, onReport);
+    for (let dbIndex = 0; dbIndex < db.length; dbIndex++) {
+        if (first.excludeRule == dbIndex)
             continue;
-        }
-        const rule = db[i];
+        const rule = db[dbIndex];
         if (!rule.head)
             continue;
-        if (rule.head.name != thisTuple.name) {
-            //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
-            continue;
-        }
-        // Rename the variables in the head and body
-        const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, thisTuple));
-        // renamedHead.ruleNumber = i;
-        const env2 = env.unify(thisTuple, renamedHead);
+        if (rule.head.name != first.name)
+            continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
+        const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
+        // renamedHead.ruleNumber = dbIndex;
+        const env2 = env.unify(first, renamedHead);
         if (env2 == null)
             continue;
+        let nextGoals = rest;
         if (rule.body != null) {
             const newFirstGoals = renameVariables(rule.body, level, renamedHead);
-            // Stick the new body list
-            let newGoals = [];
-            let j, k;
-            for (j = 0; j < newFirstGoals.length; j++) {
-                newGoals[j] = newFirstGoals[j];
+            for (let j = 0; j < newFirstGoals.length; j++)
                 if (rule.body[j].willExcludeRule)
-                    newGoals[j].excludeRule = i;
-            }
-            for (k = 1; k < goals.length; k++)
-                newGoals[j++] = goals[k];
-            const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
-            if (ret != null)
-                return ret;
+                    newFirstGoals[j].excludeRule = dbIndex;
+            nextGoals = newFirstGoals.concat(nextGoals);
         }
-        else {
-            // Just prove the rest of the goals, recursively.
-            let newGoals = [];
-            let j;
-            for (j = 1; j < goals.length; j++)
-                newGoals[j - 1] = goals[j];
-            const ret = answerQuestion(newGoals, env2, db, level + 1, onReport);
-            if (ret != null)
-                return ret;
-        }
-        if (renamedHead.commit) {
-            //print ("Debug: this goal " + thisTuple.print() + " has been committed.\n");
-            break;
-        }
-        if (thisTuple.parent.commit) {
-            //print ("Debug: parent goal " + thisTuple.parent.print() + " has been committed.\n");
-            break;
-        }
+        const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
+        if (ret != null)
+            return ret;
+        if (renamedHead.commit)
+            break; //print ("Debug: this goal " + thisTuple.print() + " has been committed.\n");
+        if (first.parent.commit)
+            break; //print ("Debug: parent goal " + thisTuple.parent.print() + " has been committed.\n");
     }
     return null;
 }
