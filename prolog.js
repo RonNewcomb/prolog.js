@@ -238,7 +238,7 @@ function answerQuestion(goals, env, db, level, onReport) {
     for (const rule of db) {
         if (rule.head == null)
             continue; // then a query got stuck in there; it shouldn't have.
-        if (rule == first.excludeRule)
+        if (rule == first.dontSelfRecurse)
             continue;
         if (rule.head.name != first.name)
             continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
@@ -251,8 +251,13 @@ function answerQuestion(goals, env, db, level, onReport) {
             // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
             const newFirstGoals = renameVariables(rule.body, level, renamedHead);
             for (let j = 0; j < newFirstGoals.length; j++)
-                if (rule.body[j].willExcludeRule)
-                    newFirstGoals[j].excludeRule = rule;
+                if (rule.body[j].markedDontSelfRecurse) {
+                    if (!newFirstGoals[j].dontSelfRecurse)
+                        console.error("wsa unset");
+                    else if (newFirstGoals[j].dontSelfRecurse != rule)
+                        console.error("was set to another rule");
+                    newFirstGoals[j].dontSelfRecurse = rule;
+                }
             nextGoals = newFirstGoals.concat(nextGoals);
         }
         const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
@@ -289,12 +294,12 @@ class Tuple {
         this.name = head;
         this.items = list;
         this.parent = parent || this;
-        this.willExcludeRule = excludeThis;
+        this.markedDontSelfRecurse = excludeThis;
     }
     // extra-logical markup goes here, outside of and just before a Tuple starts.
-    // the markup might apply to the following tuple (ops.notThis) or be unrelated (commit/tryagain)
+    // the markup might apply to the following tuple (ops.dontSelfRecurse) or be unrelated (commit/tryagain)
     static parseAtTopLevel(tk) {
-        const willExclude = tk.current == "dontSelfRecurse:" /* ops.notThis */;
+        const willExclude = tk.current == "dontSelfRecurse:" /* ops.dontSelfRecurse */;
         if (willExclude)
             tk = tk.consume();
         // Parse commit/rollback as bareword since they control the engine
@@ -305,7 +310,7 @@ class Tuple {
         }
         const tuple = Tuple.parse(tk);
         if (tuple)
-            tuple.willExcludeRule = willExclude;
+            tuple.markedDontSelfRecurse = willExclude;
         return tuple;
     }
     static parse(tk) {
@@ -446,6 +451,10 @@ class Rule {
             this.body = query;
             this.head = head;
         }
+        if (this.body)
+            for (const tuple of this.body)
+                if (tuple.markedDontSelfRecurse)
+                    tuple.dontSelfRecurse = this;
     }
     // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
     static parse(tk) {

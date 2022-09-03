@@ -296,7 +296,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
 
   for (const rule of db) {
     if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.
-    if (rule == first.excludeRule) continue;
+    if (rule == first.dontSelfRecurse) continue;
     if (rule.head.name != first.name) continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
     const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
     const env2 = env.unify(first, renamedHead); // if the first of goals[] unifies with this rule's head (vars renamed for new scope), then...
@@ -306,7 +306,7 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     if (rule.body != null) {
       // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
       const newFirstGoals = renameVariables(rule.body, level, renamedHead) as Tuple[];
-      for (let j = 0; j < newFirstGoals.length; j++) if (rule.body![j].willExcludeRule) newFirstGoals[j].excludeRule = rule;
+      for (let j = 0; j < newFirstGoals.length; j++) if (rule.body![j].markedDontSelfRecurse) newFirstGoals[j].dontSelfRecurse = rule;
       nextGoals = newFirstGoals.concat(nextGoals);
     }
     const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
@@ -355,8 +355,12 @@ class Tuple {
   type: "Tuple" = "Tuple";
   name: string;
   items: TupleItem[];
-  willExcludeRule?: boolean; //Added here is the NOTTHIS qualifier which, when it appears before a term in the body of a rule, means "don't use the current rule when attempting to satisfy this term as a subgoal". It's not clever, and it doesn't extend very far down the evaluation stack. In fact, in its current incarnation, the example here (where the rule head is defined in terms of itself immediately) is the only style that this will work with.
-  excludeRule?: Rule;
+
+  // when it appears before a term in the body of a rule, means "don't use the current rule when attempting to satisfy this term as a subgoal"
+  // It's not clever, and it doesn't extend very far down the evaluation stack. In fact, in its current incarnation, the example here
+  // (where the rule head is defined in terms of itself immediately) is the only style that this will work with.
+  markedDontSelfRecurse?: boolean;
+  dontSelfRecurse?: Rule;
   parent: Tuple;
   commit?: boolean;
 
@@ -364,7 +368,7 @@ class Tuple {
     this.name = head;
     this.items = list;
     this.parent = parent || this;
-    this.willExcludeRule = excludeThis;
+    this.markedDontSelfRecurse = excludeThis;
   }
 
   // extra-logical markup goes here, outside of and just before a Tuple starts.
@@ -381,7 +385,7 @@ class Tuple {
     }
 
     const tuple = Tuple.parse(tk);
-    if (tuple) tuple.willExcludeRule = willExclude;
+    if (tuple) tuple.markedDontSelfRecurse = willExclude;
     return tuple;
   }
 
@@ -529,6 +533,8 @@ class Rule {
       this.body = query;
       this.head = head;
     }
+    // the following doesn't work because new Tuple is everywhere and doesn't preserve the properties?
+    //if (this.body) for (const tuple of this.body) if (tuple.markedDontSelfRecurse) tuple.dontSelfRecurse = this;
   }
 
   // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
