@@ -180,7 +180,7 @@ class Environment {
     const variables: Variable[] = [];
     for (const part of parts) {
       switch (part.type) {
-        case "Atom":
+        case "Literal":
           continue;
         case "Variable":
           if (!variables.find(o => o.name == part.name)) variables.push(part);
@@ -222,7 +222,7 @@ class Environment {
       case "Tuple":
         const parts = x.items.map(each => this.value(each));
         return new Tuple(x.name, parts);
-      case "Atom":
+      case "Literal":
         return x; // We only need to check the values of variables...
       case "Variable":
         const binding = this.contents[x.name];
@@ -239,7 +239,7 @@ class Environment {
     y = this.value(y);
     if (x.type == "Variable") return this.spawn(x.name, y);
     if (y.type == "Variable") return this.spawn(y.name, x);
-    if (x.type == "Atom" || y.type == "Atom") return x.type == y.type && x.name == y.name ? this : null;
+    if (x.type == "Literal" || y.type == "Literal") return x.type == y.type && x.name == y.name ? this : null;
 
     // x.type == y.type == Tuple...
     if (x.name != y.name) return null; // Ooh, so first-order.
@@ -266,7 +266,7 @@ function renameVariables(list: TupleItem[], level: number, parent?: Tuple): Tupl
 }
 function renameVariable(part: TupleItem, level: number, parent?: Tuple): TupleItem {
   switch (part.type) {
-    case "Atom":
+    case "Literal":
       return part;
     case "Variable":
       return new Variable(part.name + "." + level);
@@ -327,9 +327,9 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
 // Head = Tuple  .
 // Query = Tuple+  ?
 // Tuple = [TupleItem+]
-// TupleItem = Variable | Atom | Tuple
+// TupleItem = Variable | Literal | Tuple
 
-type TupleItem = Variable | Atom | Tuple;
+type TupleItem = Variable | Literal | Tuple;
 
 class Variable {
   type: "Variable" = "Variable";
@@ -343,8 +343,8 @@ class Variable {
   }
 }
 
-class Atom {
-  type: "Atom" = "Atom";
+class Literal {
+  type: "Literal" = "Literal";
   name: string;
 
   constructor(head: string) {
@@ -412,7 +412,7 @@ class Tuple {
       while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 2) {
         part = part.items[1];
       }
-      if ((part.type == "Atom" && part.name == ops.nothing) || part.type == "Variable") {
+      if ((part.type == "Literal" && part.name == ops.nothing) || part.type == "Variable") {
         part = this;
         retval.push(ops.openList);
         let comma = false;
@@ -469,7 +469,7 @@ class Tuple {
       case "id":
         const symbolName = tk.current;
         tk = tk.consume();
-        return new Atom(symbolName);
+        return new Literal(symbolName);
 
       case "eof":
         return consoleOutError(tk, "unexpected end of input");
@@ -492,7 +492,7 @@ class Tuple {
     // Special case: {} = new atom(nothing).
     if (tk.type == "punc" && tk.current == ops.closeList) {
       tk = tk.consume();
-      return new Atom(ops.nothing);
+      return new Literal(ops.nothing);
     }
 
     // Get a list of parts
@@ -513,7 +513,7 @@ class Tuple {
       append = new Variable(tk.current!);
       tk = tk.consume();
     } else {
-      append = new Atom(ops.nothing);
+      append = new Literal(ops.nothing);
     }
     if (tk.current != ops.closeList) return consoleOutError(tk, "list destructure wasn't ended by }");
     tk = tk.consume();
@@ -606,7 +606,7 @@ class Rule {
 
 function hasTheImpliedUnboundVar(tuple: TupleItem): boolean {
   switch (tuple.type) {
-    case "Atom":
+    case "Literal":
       return tuple.name === ops.impliedQuestionVar;
     case "Variable":
       return tuple.name === ops.impliedQuestionVar;
@@ -739,14 +739,14 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
 
   const first = environment.value(thisTuple.items[0]);
-  if (first.type != "Atom") {
-    //print("Debug: Comparitor needs First bound to an Atom, failing\n");
+  if (first.type != "Literal") {
+    //print("Debug: Comparitor needs First bound to an Literal, failing\n");
     return null;
   }
 
   const second = environment.value(thisTuple.items[1]);
-  if (second.type != "Atom") {
-    //print("Debug: Comparitor needs Second bound to an Atom, failing\n");
+  if (second.type != "Literal") {
+    //print("Debug: Comparitor needs Second bound to an Literal, failing\n");
     return null;
   }
 
@@ -754,7 +754,7 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   if (first.name < second.name) cmp = "lt";
   else if (first.name > second.name) cmp = "gt";
 
-  const env2 = environment.unify(thisTuple.items[2], new Atom(cmp));
+  const env2 = environment.unify(thisTuple.items[2], new Literal(cmp));
 
   if (env2 == null) {
     //print("Debug: Comparitor cannot unify CmpValue with " + cmp + ", failing\n");
@@ -844,7 +844,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   // Turn anslist into a proper list and unify with 'into'
 
   // optional here: nothing anslist -> fail?
-  let answers: TupleItem = new Atom(ops.nothing);
+  let answers: TupleItem = new Literal(ops.nothing);
 
   /*
         print("Debug: anslist = [");
@@ -896,8 +896,8 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
 
   // Get the first tuple, the template.
   const first = env.value(thisTuple.items[0]);
-  if (first.type != "Atom") {
-    //print("Debug: External needs First bound to a string Atom, failing\n");
+  if (first.type != "Literal") {
+    //print("Debug: External needs First bound to a string Literal, failing\n");
     return null;
   }
   const regresult = first.name.match(/^"(.*)"$/);
@@ -912,8 +912,8 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
     const arg = env.value(second.items[0]);
-    if (arg.type != "Atom") {
-      //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
+    if (arg.type != "Literal") {
+      //print("DEBUG: External/3: argument "+i+" must be an Literal, not "); arg.print(); print("\n");
       return null;
     }
     const re = new RegExp("\\$" + i, "g");
@@ -923,7 +923,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
     second = (second as Tuple).items[1];
     i++;
   }
-  if (second.type != "Atom" || second.name != ops.nothing) {
+  if (second.type != "Literal" || second.name != ops.nothing) {
     //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
     return null;
   }
@@ -939,7 +939,7 @@ function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
   if (!ret) ret = ops.nothing;
 
   // Convert back into an atom...
-  const env2 = env.unify(thisTuple.items[2], new Atom(ret));
+  const env2 = env.unify(thisTuple.items[2], new Literal(ret));
 
   if (env2 == null) {
     //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
@@ -955,8 +955,8 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
 
   // Get the first tuple, the template.
   const first = env.value(thisTuple.items[0]);
-  if (first.type != "Atom") {
-    //print("Debug: External needs First bound to a string Atom, failing\n");
+  if (first.type != "Literal") {
+    //print("Debug: External needs First bound to a string Literal, failing\n");
     return null;
   }
   const regResult = first.name.match(/^"(.*)"$/);
@@ -971,8 +971,8 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
   while (second.type == "Tuple" && second.name == ops.cons) {
     // Go through second an argument at a time...
     const arg = env.value(second.items[0]);
-    if (arg.type != "Atom") {
-      //print("DEBUG: External/3: argument "+i+" must be an Atom, not "); arg.print(); print("\n");
+    if (arg.type != "Literal") {
+      //print("DEBUG: External/3: argument "+i+" must be an Literal, not "); arg.print(); print("\n");
       return null;
     }
     const re = new RegExp("\\$" + i, "g");
@@ -982,7 +982,7 @@ function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db
     second = second.items[1];
     i++;
   }
-  if (second.type != "Atom" || second.name != ops.nothing) {
+  if (second.type != "Literal" || second.name != ops.nothing) {
     //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
     return null;
   }
