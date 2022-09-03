@@ -100,25 +100,24 @@ function nextline(line) {
 }
 // environment ///////
 class Environment {
-    constructor() {
-        this.contents = {};
+    constructor(oldEnvironment) {
+        this.contents = Object.create(oldEnvironment?.contents || null);
     }
     // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
     spawn(name, part) {
         // We assume that name has been 'unwound' or 'followed' as far as possible
         // in the environment. If this is not the case, we could get an alias loop.
-        const newEnv = new Environment();
+        const newEnv = new Environment(this);
         newEnv.contents[name] = part;
-        for (const othername in this.contents)
-            if (othername != name)
-                newEnv.contents[othername] = this.contents[othername];
         return newEnv;
     }
     // Print out an environment's contents.
     print() {
         if (!this.contents)
             return printAnswerline("Empty.\n");
-        const retval = Object.entries(this.contents).map(([name, part]) => ` ${name} = ${part.print()}\n`);
+        const retval = []; // use for..in to get inherited properties
+        for (const name in this.contents)
+            retval.push(` ${name} = ${this.contents[name].print()}\n`);
         printAnswerline(retval.length ? retval.join("") : "Empty.\n");
     }
     // Return a list of all variables mentioned in a list of Tuples.
@@ -322,9 +321,20 @@ class Tuple {
         else if (tk.current != "]")
             return consoleOutError(tk, "expected , or ] after first tuple");
         // while not ] parse items
-        const parts = Tuple.parseItems(tk);
-        if (!parts)
-            return null;
+        const parts = [];
+        while (tk.current != "]" /* ops.close */) {
+            if (tk.type == "eof")
+                return consoleOutError(tk, "unexpected EOF while running through tuples until", "]" /* ops.close */);
+            const part = Tuple.parseItem(tk);
+            if (part == null)
+                return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
+            parts.push(part);
+            if (tk.current == ",")
+                tk = tk.consume();
+            else if (tk.current != "]" /* ops.close */)
+                return consoleOutError(tk, "a tuple ended before the " + "," /* ops.bodyTupleSeparator */ + " or the " + "]" /* ops.close */ + "  but instead got");
+        }
+        tk = tk.consume();
         return new Tuple(name, parts);
     }
     print() {
@@ -357,23 +367,6 @@ class Tuple {
         retval.push(this.items.map(each => ", " + each.print()).join(""));
         retval.push("]" /* ops.close */);
         return retval.join("");
-    }
-    static parseItems(tk) {
-        const parts = [];
-        while (tk.current != "]" /* ops.close */) {
-            if (tk.type == "eof")
-                return consoleOutError(tk, "unexpected EOF while running through tuples until", "]" /* ops.close */);
-            const part = Tuple.parseItem(tk);
-            if (part == null)
-                return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
-            parts.push(part);
-            if (tk.current == ",")
-                tk = tk.consume();
-            else if (tk.current != "]" /* ops.close */)
-                return consoleOutError(tk, "a tuple ended before the " + "," /* ops.bodyTupleSeparator */ + " or the " + "]" /* ops.close */ + "  but instead got");
-        }
-        tk = tk.consume();
-        return parts;
     }
     // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
     static parseItem(tk) {
