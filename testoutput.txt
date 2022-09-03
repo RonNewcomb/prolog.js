@@ -81,8 +81,8 @@ Memorized.
 [length, {The H | The T}, The N] if [length, The T, The M], [add, The M, 1, The N] .
 Memorized.
 # Standard prolog not/1
-[not, Term] if [call, Term], commit, [fail].
-[not, The Term] if [call, The Term], [commit], [fail] .
+[not, Term] if [call, Term], commit, get_more.
+[not, The Term] if [call, The Term], [commit], [get_more] .
 Memorized.
 [not, Term].
 [not, The Term] .
@@ -121,7 +121,7 @@ Memorized.
 [triple, type, sc, transitive].
 [triple, type, sc, transitive] .
 Memorized.
-[triple, P, X, Y] if NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
+[triple, P, X, Y] if dontSelfRecurse:[triple, type, P, transitive], dontSelfRecurse:[triple, P, X, Z], [triple, P, Z, Y].
 [triple, The P, The X, The Y] if [triple, type, The P, transitive], [triple, The P, The X, The Z], [triple, The P, The Z, The Y] .
 Memorized.
 [arcsOut, X, L] if [bagof, O, [triple, P, X, O], L].

@@ -34,10 +34,10 @@ const enum ops {
   bodyTupleSeparator = ",",
   paramSeparator = ",",
   cutCommit = "commit",
-  failRollback = "rollback",
+  failRollbackMoreAgain = "get_more",
   nothing = "nothing",
   anything = "anything",
-  notThis = "NOTTHIS",
+  dontSelfRecurse = "dontSelfRecurse:",
   cons = "cons",
 }
 
@@ -257,26 +257,27 @@ class Environment {
   }
 }
 
-// Go through a list of tuples (ie, a Body or Partlist's list) renaming variables
-// by appending 'level' to each variable name.
-// How non-graph-theoretical can this get?!?
-// "parent" points to the subgoal, the expansion of which lead to these tuples.
-function renameVariables(list: TupleItem[], level: number, parent?: Tuple): TupleItem[] {
-  return list.map(part => renameVariable(part, level, parent));
+// Go through a tuple's terms renaming variables by appending 'level' to each variable name.
+// "parent" points to the subgoal, the expansion of which led to these tuples.
+function renameVariables(items: TupleItem[], level: number, parent?: Tuple): TupleItem[] {
+  return items.map(item => renameVariable(item, level, parent));
 }
-function renameVariable(part: TupleItem, level: number, parent?: Tuple): TupleItem {
-  switch (part.type) {
+function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): TupleItem {
+  switch (rvalue.type) {
     case "Literal":
-      return part;
+      return rvalue;
     case "Variable":
-      return new Variable(part.name + "." + level);
+      return new Variable(rvalue.name + "." + level);
     case "Tuple":
-      return new Tuple(part.name, renameVariables(part.items, level, parent), parent);
+      return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent);
   }
 }
 
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
+// Prove the first tuple in the goals. We do this by trying to unify that tuple with the rules in our database. For each
+// matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
+// Then prove the new goals recursively.
 function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   console.log(level, goals, env.contents);
 
@@ -286,10 +287,6 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
     return null;
   }
 
-  // Prove the first tuple in the goals. We do this by trying to unify that tuple with the rules in our database. For each
-  // matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
-  // Then prove the new goals recursively.
-
   const first = goals[0];
   const rest = goals.slice(1);
 
@@ -297,20 +294,19 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
   const builtin = db.builtin![first.name + "/" + first.items.length];
   if (builtin) return builtin(first, rest, env, db, level + 1, onReport);
 
-  for (let dbIndex = 0; dbIndex < db.length; dbIndex++) {
-    if (first.excludeRule == dbIndex) continue;
-    const rule: Rule = db[dbIndex];
-    if (!rule.head) continue;
+  for (const rule of db) {
+    if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.
+    if (rule == first.excludeRule) continue;
     if (rule.head.name != first.name) continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
     const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
-    // renamedHead.ruleNumber = dbIndex;
-    const env2 = env.unify(first, renamedHead);
+    const env2 = env.unify(first, renamedHead); // if the first of goals[] unifies with this rule's head (vars renamed for new scope), then...
     if (env2 == null) continue;
 
-    let nextGoals = rest;
+    let nextGoals = rest; // ...pass down the rest of goals[] with the new environment to answerQuestion.
     if (rule.body != null) {
+      // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
       const newFirstGoals = renameVariables(rule.body, level, renamedHead) as Tuple[];
-      for (let j = 0; j < newFirstGoals.length; j++) if (rule.body![j].willExcludeRule) newFirstGoals[j].excludeRule = dbIndex;
+      for (let j = 0; j < newFirstGoals.length; j++) if (rule.body![j].willExcludeRule) newFirstGoals[j].excludeRule = rule;
       nextGoals = newFirstGoals.concat(nextGoals);
     }
     const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
@@ -359,8 +355,8 @@ class Tuple {
   type: "Tuple" = "Tuple";
   name: string;
   items: TupleItem[];
-  willExcludeRule?: boolean;
-  excludeRule?: number;
+  willExcludeRule?: boolean; //Added here is the NOTTHIS qualifier which, when it appears before a term in the body of a rule, means "don't use the current rule when attempting to satisfy this term as a subgoal". It's not clever, and it doesn't extend very far down the evaluation stack. In fact, in its current incarnation, the example here (where the rule head is defined in terms of itself immediately) is the only style that this will work with.
+  excludeRule?: Rule;
   parent: Tuple;
   commit?: boolean;
 
@@ -371,12 +367,14 @@ class Tuple {
     this.willExcludeRule = excludeThis;
   }
 
+  // extra-logical markup goes here, outside of and just before a Tuple starts.
+  // the markup might apply to the following tuple (ops.dontSelfRecurse) or be unrelated (commit/tryagain)
   static parseAtTopLevel(tk: Tokeniser): Tuple | null {
-    const willExclude = tk.current == ops.notThis;
+    const willExclude = tk.current == ops.dontSelfRecurse;
     if (willExclude) tk = tk.consume();
 
     // Parse commit/rollback as bareword since they control the engine
-    if ([ops.cutCommit, ops.failRollback].includes(tk.current as ops)) {
+    if ([ops.cutCommit, ops.failRollbackMoreAgain].includes(tk.current as ops)) {
       const op = tk.current;
       tk = tk.consume();
       return new Tuple(op, []);
@@ -639,6 +637,15 @@ class Tokeniser {
     if (this.remainder == "") {
       this.current = "";
       this.type = "eof";
+      return this;
+    }
+
+    // keyword
+    r = this.remainder.match(/^(dontSelfRecurse:)(.*)$/);
+    if (r) {
+      this.remainder = r[2];
+      this.current = r[1];
+      this.type = "id";
       return this;
     }
 

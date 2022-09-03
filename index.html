@@ -132,7 +132,7 @@
 [length, {H|T}, N] if [length, T, M], [add, M, 1, N].
 
 # Standard prolog not/1
-[not, Term] if [call, Term], commit, [fail].
+[not, Term] if [call, Term], commit, get_more.
 [not, Term].
 
 # Standard prolog var/1
@@ -151,7 +151,7 @@
 [triple, sc, f, g].
 [triple, type, sc, transitive].
 
-[triple, P, X, Y] if NOTTHIS [triple, type, P, transitive], NOTTHIS [triple, P, X, Z], [triple, P, Z, Y].
+[triple, P, X, Y] if dontSelfRecurse:[triple, type, P, transitive], dontSelfRecurse:[triple, P, X, Z], [triple, P, Z, Y].
 
 [arcsOut, X, L] if [bagof, O, [triple, P, X, O], L].
 

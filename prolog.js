@@ -202,25 +202,26 @@ class Environment {
         return env;
     }
 }
-// Go through a list of tuples (ie, a Body or Partlist's list) renaming variables
-// by appending 'level' to each variable name.
-// How non-graph-theoretical can this get?!?
-// "parent" points to the subgoal, the expansion of which lead to these tuples.
-function renameVariables(list, level, parent) {
-    return list.map(part => renameVariable(part, level, parent));
+// Go through a tuple's terms renaming variables by appending 'level' to each variable name.
+// "parent" points to the subgoal, the expansion of which led to these tuples.
+function renameVariables(items, level, parent) {
+    return items.map(item => renameVariable(item, level, parent));
 }
-function renameVariable(part, level, parent) {
-    switch (part.type) {
+function renameVariable(rvalue, level, parent) {
+    switch (rvalue.type) {
         case "Literal":
-            return part;
+            return rvalue;
         case "Variable":
-            return new Variable(part.name + "." + level);
+            return new Variable(rvalue.name + "." + level);
         case "Tuple":
-            return new Tuple(part.name, renameVariables(part.items, level, parent), parent);
+            return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent);
     }
 }
 // The meat of this thing... js-tinyProlog.
 // The main proving engine. Returns: null (keep going), other (drop out)
+// Prove the first tuple in the goals. We do this by trying to unify that tuple with the rules in our database. For each
+// matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
+// Then prove the new goals recursively.
 function answerQuestion(goals, env, db, level, onReport) {
     console.log(level, goals, env.contents);
     if (goals.length == 0) {
@@ -228,34 +229,30 @@ function answerQuestion(goals, env, db, level, onReport) {
         //if (!more) return true;
         return null;
     }
-    // Prove the first tuple in the goals. We do this by trying to unify that tuple with the rules in our database. For each
-    // matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
-    // Then prove the new goals recursively.
     const first = goals[0];
     const rest = goals.slice(1);
     // Do we have a builtin?
     const builtin = db.builtin[first.name + "/" + first.items.length];
     if (builtin)
         return builtin(first, rest, env, db, level + 1, onReport);
-    for (let dbIndex = 0; dbIndex < db.length; dbIndex++) {
-        if (first.excludeRule == dbIndex)
-            continue;
-        const rule = db[dbIndex];
-        if (!rule.head)
+    for (const rule of db) {
+        if (rule.head == null)
+            continue; // then a query got stuck in there; it shouldn't have.
+        if (rule == first.excludeRule)
             continue;
         if (rule.head.name != first.name)
             continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
         const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
-        // renamedHead.ruleNumber = dbIndex;
-        const env2 = env.unify(first, renamedHead);
+        const env2 = env.unify(first, renamedHead); // if the first of goals[] unifies with this rule's head (vars renamed for new scope), then...
         if (env2 == null)
             continue;
-        let nextGoals = rest;
+        let nextGoals = rest; // ...pass down the rest of goals[] with the new environment to answerQuestion.
         if (rule.body != null) {
+            // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
             const newFirstGoals = renameVariables(rule.body, level, renamedHead);
             for (let j = 0; j < newFirstGoals.length; j++)
                 if (rule.body[j].willExcludeRule)
-                    newFirstGoals[j].excludeRule = dbIndex;
+                    newFirstGoals[j].excludeRule = rule;
             nextGoals = newFirstGoals.concat(nextGoals);
         }
         const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
@@ -294,12 +291,14 @@ class Tuple {
         this.parent = parent || this;
         this.willExcludeRule = excludeThis;
     }
+    // extra-logical markup goes here, outside of and just before a Tuple starts.
+    // the markup might apply to the following tuple (ops.notThis) or be unrelated (commit/tryagain)
     static parseAtTopLevel(tk) {
-        const willExclude = tk.current == "NOTTHIS" /* ops.notThis */;
+        const willExclude = tk.current == "dontSelfRecurse:" /* ops.notThis */;
         if (willExclude)
             tk = tk.consume();
         // Parse commit/rollback as bareword since they control the engine
-        if (["commit" /* ops.cutCommit */, "rollback" /* ops.failRollback */].includes(tk.current)) {
+        if (["commit" /* ops.cutCommit */, "get_more" /* ops.failRollbackMoreAgain */].includes(tk.current)) {
             const op = tk.current;
             tk = tk.consume();
             return new Tuple(op, []);
@@ -545,6 +544,14 @@ class Tokeniser {
         if (this.remainder == "") {
             this.current = "";
             this.type = "eof";
+            return this;
+        }
+        // keyword
+        r = this.remainder.match(/^(dontSelfRecurse:)(.*)$/);
+        if (r) {
+            this.remainder = r[2];
+            this.current = r[1];
+            this.type = "id";
             return this;
         }
         // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
