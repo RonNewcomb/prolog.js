@@ -1,3 +1,4 @@
+console.log("newVars=", window.newVars);
 const database = [];
 // web browser IDE things /////
 const commandLineEl = document.getElementById("commandline");
@@ -534,7 +535,6 @@ function hasTheImpliedUnboundVar(tuple) {
             return tuple.items.some(hasTheImpliedUnboundVar);
     }
 }
-const newVars = false;
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
     constructor(line) {
@@ -577,8 +577,12 @@ class Tokeniser {
             return this;
         }
         // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
-        if (newVars)
-            r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/);
+        if (window.newVars) {
+            if (context == "rule")
+                r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
+            else
+                r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
+        }
         else {
             if (context == "rule")
                 r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
@@ -592,7 +596,7 @@ class Tokeniser {
             return this;
         }
         // variable    including ? as varName
-        if (newVars)
+        if (window.newVars)
             r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
         else
             r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);

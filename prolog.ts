@@ -1,4 +1,8 @@
-//declare global {
+interface Window {
+  newVars: boolean;
+}
+console.log("newVars=", window.newVars);
+
 interface Document {
   input: HTMLFormElement;
   rules: HTMLFormElement;
@@ -623,8 +627,6 @@ function hasTheImpliedUnboundVar(tuple: TupleItem): boolean {
   }
 }
 
-const newVars = false;
-
 // The Tiny-Prolog parser goes here.
 class Tokeniser {
   remainder: string;
@@ -679,8 +681,10 @@ class Tokeniser {
     }
 
     // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
-    if (newVars) r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/);
-    else {
+    if (window.newVars) {
+      if (context == "rule") r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
+      else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
+    } else {
       if (context == "rule") r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
       else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
     }
@@ -692,7 +696,7 @@ class Tokeniser {
     }
 
     // variable    including ? as varName
-    if (newVars) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
+    if (window.newVars) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
     else r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
     if (r) {
       this.remainder = r[2];
