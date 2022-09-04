@@ -251,7 +251,7 @@ function answerQuestion(goals, env, db, level, onReport) {
         if (nextEnvironment == null)
             continue; // no unify? try next rule in the db
         // Unifies, so recurse with the rest of goals[] and the new environment
-        // (if the rule has a body/query then (rename for scope and) prepend them to goals[])
+        // (if the rule has a body/query then (rename them for scope and) prepend them to goals[])
         const nextGoals = !rule.body ? rest : renameVariables(rule.body, level, renamedHead).concat(rest);
         const hasFailed = answerQuestion(nextGoals, nextEnvironment, db, level + 1, onReport);
         if (hasFailed != null)
@@ -307,6 +307,7 @@ class Tuple {
         return tuple;
     }
     static parse(tk) {
+        tk.contextPush("tuple");
         // [
         if (tk.type != "punc" || tk.current != "[" /* ops.open */)
             return consoleOutError(tk, "tuple must begin with", "[" /* ops.open */);
@@ -333,7 +334,7 @@ class Tuple {
             else if (tk.current != "]" /* ops.close */)
                 return consoleOutError(tk, "a tuple ended before the " + "," /* ops.bodyTupleSeparator */ + " or the " + "]" /* ops.close */ + "  but instead got");
         }
-        tk = tk.consume();
+        tk = tk.consume("pop");
         return new Tuple(name, parts);
     }
     print() {
@@ -368,14 +369,15 @@ class Tuple {
         return retval.join("");
     }
     static parseItem(tk) {
+        tk.contextPush("tupleitem");
         switch (tk.type) {
             case "var":
                 const varName = tk.current;
-                tk = tk.consume();
+                tk = tk.consume("pop");
                 return new Variable(varName);
             case "id":
                 const symbolName = tk.current;
-                tk = tk.consume();
+                tk = tk.consume("pop");
                 return new Literal(symbolName);
             case "eof":
                 return consoleOutError(tk, "unexpected end of input");
@@ -384,19 +386,26 @@ class Tuple {
             case "punc":
                 break;
         }
-        if (tk.current == "{" /* ops.openList */)
-            return Tuple.parseDestructuredList(tk);
-        if (tk.current == "[" /* ops.open */)
-            return Tuple.parse(tk);
+        if (tk.current == "{" /* ops.openList */) {
+            const t = Tuple.parseDestructuredList(tk);
+            tk.contextPop();
+            return t;
+        }
+        if (tk.current == "[" /* ops.open */) {
+            const t = Tuple.parse(tk);
+            tk.contextPop();
+            return t;
+        }
         return consoleOutError(tk, "expected a ", "[" /* ops.open */, "or", "{" /* ops.openList */, "here");
     }
     static parseDestructuredList(tk) {
+        tk.contextPush("list");
         if (tk.type != "punc" || tk.current != "{" /* ops.openList */)
             return consoleOutError(tk, "list must begin with", "{" /* ops.openList */);
         tk = tk.consume();
         // Special case: {} = new atom(nothing).
         if (tk.type == "punc" && tk.current == "}" /* ops.closeList */) {
-            tk = tk.consume();
+            tk = tk.consume("pop");
             return new Literal("nothing" /* ops.nothing */);
         }
         // Get a list of parts
@@ -424,7 +433,7 @@ class Tuple {
         }
         if (tk.current != "}" /* ops.closeList */)
             return consoleOutError(tk, "list destructure wasn't ended by }");
-        tk = tk.consume();
+        tk = tk.consume("pop");
         // Return the new cons.... of all this rubbish.
         for (let i = parts.length - 1; i >= 0; i--)
             append = new Tuple("cons" /* ops.cons */, [parts[i], append]);
@@ -449,6 +458,7 @@ class Rule {
     }
     // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
     static parse(tk) {
+        tk.contextPush("rule");
         const head = Tuple.parse(tk);
         if (!head)
             return consoleOutError(tk, "syntax error");
@@ -459,18 +469,20 @@ class Rule {
             return consoleOutError(tk, "expected one of ", expected.join(" "), "  but instead got");
         if (tk.type == "eof")
             return new Rule(head, null, isQuestion);
+        if (tk.type != "punc")
+            return consoleOutError(tk, "expected punctuation mark here not a", tk.type);
         switch (tk.current) {
             case "." /* ops.endSentence */:
-                tk = tk.consume();
+                tk = tk.consume("pop");
                 return new Rule(head, null, false); // [foo, ?].  same as [foo, anything]. but not same as [foo, ?]?
             case "?" /* ops.endQuestion */:
-                tk = tk.consume();
+                tk = tk.consume("pop");
                 return new Rule(head, null, true);
             case "if" /* ops.if */:
                 tk = tk.consume();
                 const bodyOfIf = Rule.parseBody(tk);
                 if (tk.current == "." /* ops.endSentence */)
-                    tk = tk.consume();
+                    tk = tk.consume("pop");
                 else if (tk.type != "eof")
                     return consoleOutError(tk, "expected end of sentence with a ", "." /* ops.endSentence */, " but instead got ");
                 return new Rule(head, bodyOfIf, false);
@@ -478,7 +490,7 @@ class Rule {
                 tk = tk.consume();
                 const bodyContinues = Rule.parseBody(tk);
                 if (tk.current == "?" /* ops.endQuestion */)
-                    tk.consume();
+                    tk.consume("pop");
                 else if (tk.type != "eof")
                     return consoleOutError(tk, "expected complex question to end with", "?" /* ops.endQuestion */, "but instead got ");
                 return new Rule(head, bodyContinues, true);
@@ -529,9 +541,19 @@ class Tokeniser {
         this.remainder = line;
         this.current = "";
         this.type = ""; // "eof", "id", "var", "punc" etc.
+        this.contexts = [];
         this.consume(); // Load up the first token.
     }
-    consume() {
+    contextPush(context) {
+        this.contexts.push(context);
+    }
+    contextPop() {
+        this.contexts.pop();
+    }
+    consume(popContext) {
+        if (popContext)
+            this.contextPop();
+        const context = this.contexts[this.contexts.length - 1];
         if (this.type == "eof") {
             console.warn("Tried to consume eof");
             return this;
@@ -557,8 +579,12 @@ class Tokeniser {
         // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
         if (newVars)
             r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/);
-        else
-            r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/);
+        else {
+            if (context == "rule")
+                r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
+            else
+                r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
+        }
         if (r) {
             this.remainder = r[2];
             this.current = r[1];
