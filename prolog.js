@@ -166,7 +166,7 @@ class Environment {
         switch (x.type) {
             case "Tuple":
                 const parts = x.items.map(each => this.value(each));
-                return new Tuple(x.name, parts);
+                return new Tuple(x.name, parts, undefined, x.dontSelfRecurse);
             case "Literal":
                 return x; // We only need to check the values of variables...
             case "Variable":
@@ -214,7 +214,7 @@ function renameVariable(rvalue, level, parent) {
         case "Variable":
             return new Variable(rvalue.name + "." + level);
         case "Tuple":
-            return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent);
+            return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent, rvalue.dontSelfRecurse);
     }
 }
 // The meat of this thing... js-tinyProlog.
@@ -224,6 +224,10 @@ function renameVariable(rvalue, level, parent) {
 // Then prove the new goals recursively.
 function answerQuestion(goals, env, db, level, onReport) {
     console.log(level, goals, env.contents);
+    if (level > 99) {
+        console.error("snip");
+        return true;
+    }
     if (goals.length == 0) {
         onReport(env);
         //if (!more) return true;
@@ -239,34 +243,23 @@ function answerQuestion(goals, env, db, level, onReport) {
         if (rule.head == null)
             continue; // then a query got stuck in there; it shouldn't have.
         if (rule == first.dontSelfRecurse)
-            continue;
+            continue; // prevent immediate self-recursion
         if (rule.head.name != first.name)
-            continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
-        const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
-        const env2 = env.unify(first, renamedHead); // if the first of goals[] unifies with this rule's head (vars renamed for new scope), then...
-        if (env2 == null)
-            continue;
-        let nextGoals = rest; // ...pass down the rest of goals[] with the new environment to answerQuestion.
-        if (rule.body != null) {
-            // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
-            const newFirstGoals = renameVariables(rule.body, level, renamedHead);
-            for (let j = 0; j < newFirstGoals.length; j++)
-                if (rule.body[j].markedDontSelfRecurse) {
-                    if (!newFirstGoals[j].dontSelfRecurse)
-                        console.error("wsa unset");
-                    else if (newFirstGoals[j].dontSelfRecurse != rule)
-                        console.error("was set to another rule");
-                    newFirstGoals[j].dontSelfRecurse = rule;
-                }
-            nextGoals = newFirstGoals.concat(nextGoals);
-        }
-        const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
-        if (ret != null)
-            return ret;
+            continue; // we'll need better unification to allow the 2nd-order rule matching
+        const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first), undefined, rule.head.dontSelfRecurse); // Rename head's variables
+        const nextEnvironment = env.unify(first, renamedHead); // try to unify the first of goals[] with this rule's head
+        if (nextEnvironment == null)
+            continue; // no unify? try next rule in the db
+        // Unifies, so recurse with the rest of goals[] and the new environment
+        // (if the rule has a body/query then (rename for scope and) prepend them to goals[])
+        const nextGoals = !rule.body ? rest : renameVariables(rule.body, level, renamedHead).concat(rest);
+        const hasFailed = answerQuestion(nextGoals, nextEnvironment, db, level + 1, onReport);
+        if (hasFailed != null)
+            return hasFailed;
         if (renamedHead.commit)
-            break; //print ("Debug: this goal " + thisTuple.print() + " has been committed.\n");
+            break; // this goal  thisTuple  has been committed
         if (first.parent.commit)
-            break; //print ("Debug: parent goal " + thisTuple.parent.print() + " has been committed.\n");
+            break; // parent goal  thisTuple.parent  has been committed
     }
     return null;
 }
@@ -289,12 +282,12 @@ class Literal {
     }
 }
 class Tuple {
-    constructor(head, list, parent, excludeThis) {
+    constructor(head, list, parent, dontSelfRecurse) {
         this.type = "Tuple";
         this.name = head;
         this.items = list;
         this.parent = parent || this;
-        this.markedDontSelfRecurse = excludeThis;
+        this.dontSelfRecurse = dontSelfRecurse;
     }
     // extra-logical markup goes here, outside of and just before a Tuple starts.
     // the markup might apply to the following tuple (ops.dontSelfRecurse) or be unrelated (commit/tryagain)
@@ -315,6 +308,8 @@ class Tuple {
     }
     static parse(tk) {
         // [
+        if (tk.type != "punc" || tk.current != "[" /* ops.open */)
+            return consoleOutError(tk, "tuple must begin with", "[" /* ops.open */);
         tk = tk.consume();
         // symbol/vam/number/string/bareword
         const name = tk.current;
@@ -372,17 +367,12 @@ class Tuple {
         retval.push("]" /* ops.close */);
         return retval.join("");
     }
-    // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
     static parseItem(tk) {
-        // Part -> var | id | id(optParamList)
-        // Part -> [ listBit ] ::-> cons(...)
         switch (tk.type) {
-            // var?  parse & return
             case "var":
                 const varName = tk.current;
                 tk = tk.consume();
                 return new Variable(varName);
-            // bareword? atom?  parse & return
             case "id":
                 const symbolName = tk.current;
                 tk = tk.consume();
@@ -401,7 +391,8 @@ class Tuple {
         return consoleOutError(tk, "expected a ", "[" /* ops.open */, "or", "{" /* ops.openList */, "here");
     }
     static parseDestructuredList(tk) {
-        // list destructure?  parse & return
+        if (tk.type != "punc" || tk.current != "{" /* ops.openList */)
+            return consoleOutError(tk, "list must begin with", "{" /* ops.openList */);
         tk = tk.consume();
         // Special case: {} = new atom(nothing).
         if (tk.type == "punc" && tk.current == "}" /* ops.closeList */) {
@@ -709,7 +700,7 @@ function Call(thisTuple, goals, env, db, level, onReport) {
     return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 function Fail(thisTuple, goals, env, db, level, onReport) {
-    return null; // TODO shouldn't this return True or something?
+    return true; // TODO shouldn't this return True or something?
 }
 function BagOf(thisTuple, goals, env, db, level, onReport) {
     // bagof(Tuple, ConditionTuple, ReturnList)

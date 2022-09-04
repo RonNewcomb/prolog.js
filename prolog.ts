@@ -221,7 +221,7 @@ class Environment {
     switch (x.type) {
       case "Tuple":
         const parts = x.items.map(each => this.value(each));
-        return new Tuple(x.name, parts);
+        return new Tuple(x.name, parts, undefined, x.dontSelfRecurse);
       case "Literal":
         return x; // We only need to check the values of variables...
       case "Variable":
@@ -269,7 +269,7 @@ function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): Tuple
     case "Variable":
       return new Variable(rvalue.name + "." + level);
     case "Tuple":
-      return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent);
+      return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent, rvalue.dontSelfRecurse);
   }
 }
 
@@ -280,6 +280,11 @@ function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): Tuple
 // Then prove the new goals recursively.
 function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   console.log(level, goals, env.contents);
+
+  if (level > 99) {
+    console.error("snip");
+    return true;
+  }
 
   if (goals.length == 0) {
     onReport(env);
@@ -296,25 +301,21 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
 
   for (const rule of db) {
     if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.
-    if (rule == first.dontSelfRecurse) continue;
-    if (rule.head.name != first.name) continue; //consoleOutError(tk, "DEBUG: we'll need better unification to allow the 2nd-order rule matching\n");
-    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first)); // Rename the variables in the head and body
-    const env2 = env.unify(first, renamedHead); // if the first of goals[] unifies with this rule's head (vars renamed for new scope), then...
-    if (env2 == null) continue;
+    if (rule == first.dontSelfRecurse) continue; // prevent immediate self-recursion
+    if (rule.head.name != first.name) continue; // we'll need better unification to allow the 2nd-order rule matching
+    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first), undefined, rule.head.dontSelfRecurse); // Rename head's variables
+    const nextEnvironment = env.unify(first, renamedHead); // try to unify the first of goals[] with this rule's head
+    if (nextEnvironment == null) continue; // no unify? try next rule in the db
 
-    let nextGoals = rest; // ...pass down the rest of goals[] with the new environment to answerQuestion.
-    if (rule.body != null) {
-      // ...also if the rule has a body/query then (rename for scope and) add them to goals[]
-      const newFirstGoals = renameVariables(rule.body, level, renamedHead) as Tuple[];
-      for (let j = 0; j < newFirstGoals.length; j++) if (rule.body![j].markedDontSelfRecurse) newFirstGoals[j].dontSelfRecurse = rule;
-      nextGoals = newFirstGoals.concat(nextGoals);
-    }
-    const ret = answerQuestion(nextGoals, env2, db, level + 1, onReport);
-    if (ret != null) return ret;
-    if (renamedHead.commit) break; //print ("Debug: this goal " + thisTuple.print() + " has been committed.\n");
-    if (first.parent.commit) break; //print ("Debug: parent goal " + thisTuple.parent.print() + " has been committed.\n");
+    // Unifies, so recurse with the rest of goals[] and the new environment
+    // (if the rule has a body/query then (rename them for scope and) prepend them to goals[])
+    const nextGoals = !rule.body ? rest : (renameVariables(rule.body, level, renamedHead) as Tuple[]).concat(rest);
+
+    const hasFailed = answerQuestion(nextGoals, nextEnvironment, db, level + 1, onReport);
+    if (hasFailed != null) return hasFailed;
+    if (renamedHead.commit) break; // this goal  thisTuple  has been committed
+    if (first.parent.commit) break; // parent goal  thisTuple.parent  has been committed
   }
-
   return null;
 }
 
@@ -364,11 +365,11 @@ class Tuple {
   parent: Tuple;
   commit?: boolean;
 
-  constructor(head: string, list: TupleItem[], parent?: Tuple, excludeThis?: boolean) {
+  constructor(head: string, list: TupleItem[], parent?: Tuple, dontSelfRecurse?: Rule) {
     this.name = head;
     this.items = list;
     this.parent = parent || this;
-    this.markedDontSelfRecurse = excludeThis;
+    this.dontSelfRecurse = dontSelfRecurse;
   }
 
   // extra-logical markup goes here, outside of and just before a Tuple starts.
@@ -391,6 +392,7 @@ class Tuple {
 
   static parse(tk: Tokeniser): Tuple | null {
     // [
+    if (tk.type != "punc" || tk.current != ops.open) return consoleOutError(tk, "tuple must begin with", ops.open);
     tk = tk.consume();
 
     // symbol/vam/number/string/bareword
@@ -449,19 +451,13 @@ class Tuple {
     return retval.join("");
   }
 
-  // This was a beautiful piece of code. It got kludged to add [a,b,c|Z] sugar.
   static parseItem(tk: Tokeniser): TupleItem | null {
-    // Part -> var | id | id(optParamList)
-    // Part -> [ listBit ] ::-> cons(...)
-
     switch (tk.type) {
-      // var?  parse & return
       case "var":
         const varName = tk.current;
         tk = tk.consume();
         return new Variable(varName);
 
-      // bareword? atom?  parse & return
       case "id":
         const symbolName = tk.current;
         tk = tk.consume();
@@ -482,7 +478,7 @@ class Tuple {
   }
 
   static parseDestructuredList(tk: Tokeniser): TupleItem | null {
-    // list destructure?  parse & return
+    if (tk.type != "punc" || tk.current != ops.openList) return consoleOutError(tk, "list must begin with", ops.openList);
     tk = tk.consume();
 
     // Special case: {} = new atom(nothing).
@@ -533,8 +529,7 @@ class Rule {
       this.body = query;
       this.head = head;
     }
-    // the following doesn't work because new Tuple is everywhere and doesn't preserve the properties?
-    //if (this.body) for (const tuple of this.body) if (tuple.markedDontSelfRecurse) tuple.dontSelfRecurse = this;
+    if (this.body) for (const tuple of this.body) if (tuple.markedDontSelfRecurse) tuple.dontSelfRecurse = this;
   }
 
   // A rule is a Head followedBy   .   orBy   if Body   orBy    ?    or contains ? as a Var   or just ends, where . or ? is assumed
@@ -825,7 +820,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
 }
 
 function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  return null; // TODO shouldn't this return True or something?
+  return true; // TODO shouldn't this return True or something?
 }
 
 type AnswerList = TupleItem[] & { renumber?: number };
