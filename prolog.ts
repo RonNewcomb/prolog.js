@@ -113,8 +113,7 @@ function init() {
   database.builtin["ask/1"] = Ask;
   database.builtin[ops.failRollbackMoreAgain + "/0"] = More;
   database.builtin["bagof/3"] = BagOf;
-  database.builtin["javascript/3"] = ExternalJsLiteral;
-  database.builtin["javascript2/3"] = ExternalJsTupleItem;
+  database.builtin["javascript/3"] = ExternalJS;
   printAnswerline("Attachments done.\n");
 
   printAnswerline("Parsing rulesets.\n");
@@ -755,7 +754,7 @@ function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, l
   const first: TupleItem = env.value(thisTuple.items[1]);
   if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
   first.parent = thisTuple;
-  const newGoals: Tuple[] = [first].concat(goals);
+  const newGoals = [first].concat(goals);
   return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 
@@ -809,13 +808,7 @@ function BagOfCollectFunction(collecting: TupleItem, anslist: AnswerList): Repor
 // arg3: return value from javascript, if any
 const EvalContext: any[] = [];
 
-function ExternalJsLiteral(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  return ExternalJS(true, thisTuple, goals, env, db, level, onReport);
-}
-function ExternalJsTupleItem(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  return ExternalJS(false, thisTuple, goals, env, db, level, onReport);
-}
-function ExternalJS(toLiteral: boolean, term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Get the first tuple, the template.
   const template = env.value(term.items[1]);
   const regresult = template.name.match(/^"(.*)"$/);
@@ -844,7 +837,7 @@ function ExternalJS(toLiteral: boolean, term: Tuple, goals: Tuple[], env: Enviro
   if (!jsReturnValue) jsReturnValue = ops.nothing;
 
   // Convert back into an literal or tupleitem...
-  const part = toLiteral ? new Literal(jsReturnValue) : Tuple.parseItem(new Tokeniser(jsReturnValue));
+  const part = Tuple.parseItem(new Tokeniser((jsReturnValue ?? "").toString()));
   const env2 = env.unify(term.items[3], part!);
   if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", jsReturnValue);
   return answerQuestion(goals, env2, db, level + 1, onReport);
