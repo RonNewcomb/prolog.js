@@ -1,14 +1,7 @@
-interface Window {
-  newVars: boolean;
-}
-console.log("newVars=", window.newVars);
-
 interface Document {
   input: HTMLFormElement;
   rules: HTMLFormElement;
-  output: HTMLFormElement;
 }
-//}
 
 // types ///////////////
 
@@ -682,13 +675,8 @@ class Tokeniser {
     }
 
     // punctuation   openList {  closeList }  endSentence .  ummm ,  open [ close ] sliceList | ummm !  if if
-    if (window.newVars) {
-      if (context == "rule") r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
-      else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
-    } else {
-      if (context == "rule") r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
-      else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
-    }
+    if (context == "rule") r = this.remainder.match(/^([\{\}\.\?,\[\]\|\!]|(?:\bif\b))(.*)$/); // with question mark
+    else r = this.remainder.match(/^([\{\}\.,\[\]\|\!]|(?:\bif\b))(.*)$/); // withOUT question mark
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
@@ -697,11 +685,8 @@ class Tokeniser {
     }
 
     // variable    including ? as varName
-    if (!window.newVars) r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
-    else {
-      if (context == "tuple") r = this.remainder.match(/^(\?)(.*)$/);
-      if (!r) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
-    }
+    if (context == "tuple") r = this.remainder.match(/^(\?)(.*)$/);
+    if (!r) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
