@@ -51,6 +51,12 @@ function newConsoleLine(): HTMLDivElement {
   return elemDiv;
 }
 
+let showEcholines = document.input.showparse.checked;
+function toggleEcholines() {
+  showEcholines = !showEcholines;
+  document.querySelectorAll<HTMLDivElement>("div.echodiv").forEach(el => (el.style.display = showEcholines ? "block" : "none"));
+}
+
 function printUserline(str: string) {
   const div = newConsoleLine();
   div.classList.add("userdiv");
@@ -58,7 +64,6 @@ function printUserline(str: string) {
 }
 
 function printEcholine(str: string) {
-  if (!document.input.showparse.checked) return;
   const div = newConsoleLine();
   div.classList.add("echodiv");
   div.innerHTML = "<span>" + str + "</span>";
@@ -134,7 +139,7 @@ function nextline(line: string): Database {
       reported = true;
       env.printBindings(rule.body!);
     };
-    console.log("Asking", line);
+    //console.log("Asking", line);
     answerQuestion(renameVariables(rule.body!, 0) as Tuple[], new Environment(), database, 1, reportFn);
     if (!reported) printAnswerline("No.\n");
   } else {
@@ -276,12 +281,9 @@ function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): Tuple
 // matching rule, replace the tuple with the body of the matching rule, with appropriate substitutions.
 // Then prove the new goals recursively.
 function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  console.log(level, goals, env.contents);
+  //console.log(level, goals, env.contents);
 
-  if (level > 99) {
-    console.error("snip");
-    return true;
-  }
+  if (level > 99) return consoleOutError(null, "maximum recursion depth of 99 exceeded") || true;
 
   if (goals.length == 0) {
     onReport(env);
