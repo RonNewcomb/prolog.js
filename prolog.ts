@@ -83,10 +83,10 @@ function printAnswerline(str: string) {
   div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
 }
 
-function consoleOutError(tk: Tokeniser, ...rest: any[]): null {
+function consoleOutError(tk: Tokeniser | null, ...rest: any[]): null {
   const div = newConsoleLine();
   div.classList.add("errdiv");
-  div.innerHTML = "<div><div><span class=err>" + rest.join(" ") + "</span></div><div>" + tk.current + tk.remainder + "</div></div>";
+  div.innerHTML = "<div><div><span class=err>" + rest.join(" ") + "</span></div><div>" + (tk ? tk.current + tk.remainder : "") + "</div></div>";
   newConsoleLine();
   return null;
 }
@@ -115,8 +115,8 @@ function init() {
   database.builtin["call/1"] = Call;
   database.builtin["fail/0"] = Fail;
   database.builtin["bagof/3"] = BagOf;
-  database.builtin["external/3"] = ExternalJS;
-  database.builtin["external2/3"] = ExternalAndParse;
+  database.builtin["external/3"] = ExternalJsLiteral;
+  database.builtin["external2/3"] = ExternalJsTupleItem;
   printAnswerline("Attachments done.\n");
 
   printAnswerline("Parsing rulesets.\n");
@@ -652,6 +652,7 @@ class Tokeniser {
 
   consume(popContext?: "pop"): this {
     if (popContext) this.contextPop();
+
     const context = this.contexts[this.contexts.length - 1];
 
     if (this.type == "eof") {
@@ -660,7 +661,7 @@ class Tokeniser {
     }
 
     // Eat any leading WS
-    let r: RegExpMatchArray | null = this.remainder.match(/^\s*(.*)$/);
+    let r: RegExpMatchArray | null = this.remainder.match(/^\s+(.*)$/);
     if (r) {
       this.remainder = r[1];
     }
@@ -758,166 +759,70 @@ class Tokeniser {
   }
 }
 
-// A sample builtin function, including all the bits you need to get it to work
-// within the general proving mechanism.
-
-// compare(First, Second, CmpValue)
-// First, Second must be bound to strings here.
-// CmpValue is bound to -1, 0, 1
-function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  //DEBUG print ("in Comparitor.prove()...\n");
-  // Prove the builtin bit, then break out and prove
-  // the remaining goals.
-
-  // if we were intending to have a resumable builtin (one that can return
-  // multiple bindings) then we'd wrap all of this in a while() loop.
-
-  // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
-
-  const first = environment.value(thisTuple.items[0]);
-  if (first.type != "Literal") {
-    //print("Debug: Comparitor needs First bound to an Literal, failing\n");
-    return null;
-  }
-
-  const second = environment.value(thisTuple.items[1]);
-  if (second.type != "Literal") {
-    //print("Debug: Comparitor needs Second bound to an Literal, failing\n");
-    return null;
-  }
-
-  let cmp = "eq";
-  if (first.name < second.name) cmp = "lt";
-  else if (first.name > second.name) cmp = "gt";
-
-  const env2 = environment.unify(thisTuple.items[2], new Literal(cmp));
-
-  if (env2 == null) {
-    //print("Debug: Comparitor cannot unify CmpValue with " + cmp + ", failing\n");
-    return null;
-  }
-
-  // Just prove the rest of the goals, recursively.
-  return answerQuestion(goals, env2, db, level + 1, onReport);
-}
+// A sample builtin function, including all the bits you need to get it to work within the general proving mechanism.
+// General plan:
+// Prove the builtin bit, then break out and prove the remaining goals.
+// If we were intending to have a resumable builtin (one that can return multiple bindings) then we'd wrap all of this in a while() loop.
+// var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level)); // Rename the variables in the head and body
 
 function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  //DEBUG print ("in Comparitor.prove()...\n");
-  // Prove the builtin bit, then break out and prove
-  // the remaining goals.
-
-  // if we were intending to have a resumable builtin (one that can return
-  // multiple bindings) then we'd wrap all of this in a while() loop.
-
-  // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
-
-  // On the way through, we do nothing...
-
-  // Just prove the rest of the goals, recursively.
-  const ret = answerQuestion(goals, environment, db, level + 1, onReport);
-
-  // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
-  //print ("Debug: backtracking through commit/0: thisTuple.parent = "); thisTuple.parent.print(); print("\n");
-  thisTuple.parent.commit = true;
-
+  const ret = answerQuestion(goals, environment, db, level + 1, onReport); // On the way through, we do nothing... Just prove the rest of the goals, recursively.
+  thisTuple.parent.commit = true; // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
   return ret;
-}
-
-// Given a single argument, it sticks it on the goal list.
-function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  // Prove the builtin bit, then break out and prove
-  // the remaining goals.
-
-  // Rename the variables in the head and body
-  // var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level));
-
-  const first: TupleItem = env.value(thisTuple.items[0]);
-  if (first.type != "Tuple") {
-    //print("Debug: Call needs parameter bound to a Tuple, failing\n");
-    return null;
-  }
-
-  //var newGoal = new Tuple(first.name, renameVariables(first.items.list, level, thisTuple));
-  //newGoal.parent = thisTuple;
-
-  // Stick this as a new goal on the start of the goals
-  const newGoals: Tuple[] = [];
-  newGoals[0] = first;
-  first.parent = thisTuple;
-
-  let j;
-  for (j = 0; j < goals.length; j++) newGoals[j + 1] = goals[j];
-
-  // Just prove the rest of the goals, recursively.
-  return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 
 function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   return true; // TODO shouldn't this return True or something?
 }
 
+// Given a single argument, it sticks it on the goal list.
+function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  const first: TupleItem = env.value(thisTuple.items[0]);
+  if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
+  first.parent = thisTuple;
+  const newGoals: Tuple[] = [first].concat(goals);
+  return answerQuestion(newGoals, env, db, level + 1, onReport);
+}
+
+// compare(First, Second, CmpValue) // First, Second must be bound to strings here. // CmpValue is bound to -1, 0, 1
+function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  const first = environment.value(thisTuple.items[0]);
+  if (first.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type) || true;
+  const second = environment.value(thisTuple.items[1]);
+  if (second.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", second.name, "is a ", second.type) || true;
+  const cmp = first.name < second.name ? "lt" : first.name > second.name ? "gt" : "eq";
+  const env2 = environment.unify(thisTuple.items[2], new Literal(cmp));
+  if (env2 == null) return consoleOutError(null, "[Comparitor] cannot unify CmpValue with", cmp) || true;
+  return answerQuestion(goals, env2, db, level + 1, onReport);
+}
+
 type AnswerList = TupleItem[] & { renumber?: number };
 
+// bagof(Tuple, ConditionTuple, ReturnList)
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  // bagof(Tuple, ConditionTuple, ReturnList)
-
-  let collect: TupleItem = env.value(thisTuple.items[0]);
+  let collect = env.value(thisTuple.items[0]);
   const subgoal = env.value(thisTuple.items[1]) as Tuple;
   const into = env.value(thisTuple.items[2]);
-
   collect = renameVariable(collect, level, thisTuple);
-  const newGoal = new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple);
-
-  const newGoals = [];
-  newGoals[0] = newGoal;
+  const newGoals = [new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple)];
 
   // Prove this subgoal, collecting up the environments...
   const anslist = [] as AnswerList;
   anslist.renumber = -1;
   answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, anslist));
 
-  // Turn anslist into a proper list and unify with 'into'
-
-  // optional here: nothing anslist -> fail?
+  // Turn anslist into a proper list and unify with 'into' // optional here: nothing anslist -> fail?
   let answers: TupleItem = new Literal(ops.nothing);
-
-  /*
-        print("Debug: anslist = [");
-            for (let j = 0; j < anslist.length; j++) {
-                anslist[j].print();
-                print(", ");
-            }
-        print("]\n");
-        */
-
   for (let i = anslist.length; i > 0; i--) answers = new Tuple(ops.cons, [anslist[i - 1], answers]);
 
-  //print("Debug: unifying "); into.print(); print(" with "); answers.print(); print("\n");
   const env2 = env.unify(into, answers);
-
-  if (env2 == null) {
-    //print("Debug: bagof cannot unify anslist with "); into.print(); print(", failing\n");
-    return null;
-  }
-
-  // Just prove the rest of the goals, recursively.
+  if (env2 == null) return consoleOutError(null, "[bagof] cannot unify anslist with", into.print()) || true;
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
 // Aux function: return the onReport to use with a bagof subgoal
 function BagOfCollectFunction(collect: TupleItem, anslist: AnswerList): ReportFunction {
   return function (env: Environment) {
-    /*
-                print("DEBUG: solution in bagof/3 found...\n");
-                print("Value of collection tuple ");
-                collect.print();
-                print(" in this environment = ");
-                (value(collect, env)).print();
-                print("\n");
-                printEnv(env);
-                */
     // Rename this appropriately and throw it into anslist
     anslist[anslist.length] = renameVariable(env.value(collect), anslist.renumber!--) as TupleItem;
   };
@@ -928,124 +833,51 @@ function BagOfCollectFunction(collect: TupleItem, anslist: AnswerList): ReportFu
 // first: a template string that uses $1, $2, etc. as placeholders for
 const EvalContext: any[] = [];
 
-function ExternalJS(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  //print ("DEBUG: in External...\n");
-
+function ExternalJsLiteral(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  return ExternalJS(true, thisTuple, goals, env, db, level, onReport);
+}
+function ExternalJsTupleItem(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  return ExternalJS(false, thisTuple, goals, env, db, level, onReport);
+}
+function ExternalJS(
+  toLiteral: boolean,
+  thisTuple: Tuple,
+  goals: Tuple[],
+  env: Environment,
+  db: Database,
+  level: number,
+  onReport: ReportFunction
+): FunctorResult {
   // Get the first tuple, the template.
-  const first = env.value(thisTuple.items[0]);
-  if (first.type != "Literal") {
-    //print("Debug: External needs First bound to a string Literal, failing\n");
-    return null;
-  }
-  const regresult = first.name.match(/^"(.*)"$/);
-  if (!regresult) return null;
+  const template = env.value(thisTuple.items[0]);
+  const regresult = template.name.match(/^"(.*)"$/);
+  if (template.type != "Literal" || !regresult)
+    return consoleOutError(null, 'First noun of [ExternalJS] must be a regex in "double quotes" not', template.name) || true;
+
   let r = regresult[1];
 
-  //print("DEBUG: template for External/3 is "+r+"\n");
-
   // Get the second tuple, the argument list.
   let second: TupleItem = env.value(thisTuple.items[1]);
   let i = 1;
   while (second.type == "Tuple" && second.name == ops.cons) {
-    // Go through second an argument at a time...
     const arg = env.value(second.items[0]);
-    if (arg.type != "Literal") {
-      //print("DEBUG: External/3: argument "+i+" must be an Literal, not "); arg.print(); print("\n");
-      return null;
-    }
-    const re = new RegExp("\\$" + i, "g");
-    //print("DEBUG: External/3: RegExp is "+re+", arg is "+arg.name+"\n");
+    if (arg.type != "Literal") return consoleOutError(null, "Second noun of [External] must contain all literals. #" + i, "is a", arg.print()) || true;
+    const re = new RegExp("\\$" + i, "g"); // replace $1, $2, etc with values of passed-in params
     r = r.replace(re, arg.name);
-    //print("DEBUG: External/3: r becomes "+r+"\n");
-    second = (second as Tuple).items[1];
-    i++;
-  }
-  if (second.type != "Literal" || second.name != ops.nothing) {
-    //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
-    return null;
-  }
-
-  //print("DEBUG: External/3 about to eval \""+r+"\"\n");
-
-  let ret: string;
-  // @ts-ignore
-  with (EvalContext) ret = eval(r);
-
-  //print("DEBUG: External/3 got "+ret+" back\n");
-
-  if (!ret) ret = ops.nothing;
-
-  // Convert back into an atom...
-  const env2 = env.unify(thisTuple.items[2], new Literal(ret));
-
-  if (env2 == null) {
-    //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
-    return null;
-  }
-
-  // Just prove the rest of the goals, recursively.
-  return answerQuestion(goals, env2, db, level + 1, onReport);
-}
-
-function ExternalAndParse(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  //print ("DEBUG: in External...\n");
-
-  // Get the first tuple, the template.
-  const first = env.value(thisTuple.items[0]);
-  if (first.type != "Literal") {
-    //print("Debug: External needs First bound to a string Literal, failing\n");
-    return null;
-  }
-  const regResult = first.name.match(/^"(.*)"$/);
-  if (!regResult) return null;
-  let r = regResult[1];
-
-  //print("DEBUG: template for External/3 is "+r+"\n");
-
-  // Get the second tuple, the argument list.
-  let second: TupleItem = env.value(thisTuple.items[1]);
-  let i = 1;
-  while (second.type == "Tuple" && second.name == ops.cons) {
-    // Go through second an argument at a time...
-    const arg = env.value(second.items[0]);
-    if (arg.type != "Literal") {
-      //print("DEBUG: External/3: argument "+i+" must be an Literal, not "); arg.print(); print("\n");
-      return null;
-    }
-    const re = new RegExp("\\$" + i, "g");
-    //print("DEBUG: External/3: RegExp is "+re+", arg is "+arg.name+"\n");
-    r = r.replace(re, arg.name);
-    //print("DEBUG: External/3: r becomes "+r+"\n");
     second = second.items[1];
     i++;
   }
-  if (second.type != "Literal" || second.name != ops.nothing) {
-    //print("DEBUG: External/3 needs second to be a list, not "); second.print(); print("\n");
-    return null;
-  }
-
-  //print("DEBUG: External/3 about to eval \""+r+"\"\n");
+  if (second.type != "Literal" || second.name != ops.nothing) return consoleOutError(null, "[External] second noun must be a list, not", second.print());
 
   let ret: string;
   // @ts-ignore
   with (EvalContext) ret = eval(r);
-
-  //print("DEBUG: External/3 got "+ret+" back\n");
-
   if (!ret) ret = ops.nothing;
 
-  // Convert back into a Prolog tuple by calling the appropriate Parse routine...
-  const part = Tuple.parseItem(new Tokeniser(ret));
-  //print("DEBUG: external2, ret = "); ret.print(); print(".\n");
-
+  // Convert back into an literal or tupleitem...
+  const part = toLiteral ? new Literal(ret) : Tuple.parseItem(new Tokeniser(ret));
   const env2 = env.unify(thisTuple.items[2], part!);
-
-  if (env2 == null) {
-    //print("Debug: External/3 cannot unify OutValue with " + ret + ", failing\n");
-    return null;
-  }
-
-  // Just prove the rest of the goals, recursively.
+  if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", ret);
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
