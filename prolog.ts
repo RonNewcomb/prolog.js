@@ -223,7 +223,7 @@ class Environment {
     switch (x.type) {
       case "Tuple":
         const parts = x.items.map(each => this.value(each));
-        return new Tuple(x.name, parts, undefined, x.dontSelfRecurse);
+        return new Tuple(parts, undefined, x.dontSelfRecurse);
       case "Literal":
         return x; // We only need to check the values of variables...
       case "Variable":
@@ -271,7 +271,7 @@ function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): Tuple
     case "Variable":
       return new Variable(rvalue.name + "." + level);
     case "Tuple":
-      return new Tuple(rvalue.name, renameVariables(rvalue.items, level, parent), parent, rvalue.dontSelfRecurse);
+      return new Tuple(renameVariables(rvalue.items, level, parent), parent, rvalue.dontSelfRecurse);
   }
 }
 
@@ -295,14 +295,14 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
   const rest = goals.slice(1);
 
   // Do we have a builtin?
-  const builtin = db.builtin![first.name + "/" + first.items.length];
+  const builtin = db.builtin![first.name + "/" + (first.items.length - 1)];
   if (builtin) return builtin(first, rest, env, db, level + 1, onReport);
 
   for (const rule of db) {
     if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.
     if (rule == first.dontSelfRecurse) continue; // prevent immediate self-recursion
     if (rule.head.name != first.name) continue; // we'll need better unification to allow the 2nd-order rule matching
-    const renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items, level, first), undefined, rule.head.dontSelfRecurse); // Rename head's variables
+    const renamedHead = new Tuple(renameVariables(rule.head.items, level, first), undefined, rule.head.dontSelfRecurse); // Rename head's variables
     const nextEnvironment = env.unify(first, renamedHead); // try to unify the first of goals[] with this rule's head
     if (nextEnvironment == null) continue; // no unify? try next rule in the db
 
@@ -364,8 +364,8 @@ class Tuple {
   parent: Tuple;
   commit?: boolean;
 
-  constructor(head: string, list: TupleItem[], parent?: Tuple, dontSelfRecurse?: Rule) {
-    this.name = head;
+  constructor(list: TupleItem[], parent?: Tuple, dontSelfRecurse?: Rule) {
+    this.name = list[0]?.name || "anonymous";
     this.items = list;
     this.parent = parent || this;
     this.dontSelfRecurse = dontSelfRecurse;
@@ -381,7 +381,7 @@ class Tuple {
     if ([ops.cutCommit, ops.failRollbackMoreAgain].includes(tk.current as ops)) {
       const op = tk.current;
       tk = tk.consume();
-      return new Tuple(op, []);
+      return new Tuple([new Literal(op)]);
     }
 
     const tuple = Tuple.parse(tk);
@@ -396,18 +396,10 @@ class Tuple {
     if (tk.type != "punc" || tk.current != ops.open) return consoleOutError(tk, "tuple must begin with", ops.open);
     tk = tk.consume();
 
-    // symbol/vam/number/string/bareword
-    const name = tk.current;
-    tk = tk.consume();
-
-    //   ,  or  ]
-    if (tk.current == ",") tk = tk.consume();
-    else if (tk.current != "]") return consoleOutError(tk, "expected , or ] after first tuple");
-
     // while not ] parse items
     const parts: TupleItem[] = [];
     while (tk.current != ops.close) {
-      if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tupleitems for", name);
+      if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tupleitems");
 
       const part = Tuple.parseItem(tk);
       if (part == null) return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
@@ -418,25 +410,25 @@ class Tuple {
         return consoleOutError(tk, "a tuple ended before the " + ops.bodyTupleSeparator + " or the " + ops.close + "  but instead got");
     }
     tk = tk.consume("pop");
-    return new Tuple(name, parts);
+    return new Tuple(parts);
   }
 
   print(): string {
     const retval: string[] = [];
     if (this.name == ops.cons) {
       let part: TupleItem = this;
-      while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 2) {
-        part = part.items[1];
+      while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 3) {
+        part = part.items[2];
       }
       if ((part.type == "Literal" && part.name == ops.nothing) || part.type == "Variable") {
         part = this;
         retval.push(ops.openList);
         let comma = false;
-        while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 2) {
+        while (part.type == "Tuple" && part.name == ops.cons && part.items.length == 3) {
           if (comma) retval.push(", ");
-          retval.push(part.items[0].print());
+          retval.push(part.items[1].print());
           comma = true;
-          part = part.items[1];
+          part = part.items[2];
         }
         if (part.type == "Variable") {
           retval.push(" " + ops.sliceList + " ");
@@ -446,8 +438,8 @@ class Tuple {
         return retval.join("");
       }
     }
-    retval.push(ops.open + this.name);
-    retval.push(this.items.map(each => ", " + each.print()).join(""));
+    retval.push(ops.open);
+    retval.push(this.items.map(each => each.print()).join(", "));
     retval.push(ops.close);
     return retval.join("");
   }
@@ -522,7 +514,7 @@ class Tuple {
     if (tk.current != ops.closeList) return consoleOutError(tk, "list destructure wasn't ended by }");
     tk = tk.consume("pop");
     // Return the new cons.... of all this rubbish.
-    for (let i = parts.length - 1; i >= 0; i--) append = new Tuple(ops.cons, [parts[i], append]);
+    for (let i = parts.length - 1; i >= 0; i--) append = new Tuple([new Literal(ops.cons), parts[i], append]);
     return append;
   }
 }
@@ -753,7 +745,7 @@ class Tokeniser {
 // General plan:
 // Prove the builtin bit, then break out and prove the remaining goals.
 // If we were intending to have a resumable builtin (one that can return multiple bindings) then we'd wrap all of this in a while() loop.
-// var renamedHead = new Tuple(rule.head.name, renameVariables(rule.head.items.list, level)); // Rename the variables in the head and body
+// var renamedHead = new Tuple(renameVariables(rule.head.items.list, level)); // Rename the variables in the head and body
 
 function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const ret = answerQuestion(goals, environment, db, level + 1, onReport); // On the way through, we do nothing... Just prove the rest of the goals, recursively.
@@ -767,7 +759,7 @@ function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
 
 // [call, X].  Given a single argument, it sticks it on the goal list.
 function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  const first: TupleItem = env.value(thisTuple.items[0]);
+  const first: TupleItem = env.value(thisTuple.items[1]);
   if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
   first.parent = thisTuple;
   const newGoals: Tuple[] = [first].concat(goals);
@@ -776,12 +768,12 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
 
 // [compare, First: string|number, Second: string|number, CmpValue: gt|eq|lt]
 function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  const first = environment.value(thisTuple.items[0]);
+  const first = environment.value(thisTuple.items[1]);
   if (first.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type) || true;
-  const second = environment.value(thisTuple.items[1]);
+  const second = environment.value(thisTuple.items[2]);
   if (second.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", second.name, "is a ", second.type) || true;
   const cmp = first.name < second.name ? "lt" : first.name > second.name ? "gt" : "eq";
-  const env2 = environment.unify(thisTuple.items[2], new Literal(cmp));
+  const env2 = environment.unify(thisTuple.items[3], new Literal(cmp));
   if (env2 == null) return consoleOutError(null, "[Comparitor] cannot unify final noun with", cmp) || true;
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
@@ -790,11 +782,11 @@ type AnswerList = TupleItem[] & { renumber?: number };
 
 // [bagof, Tuple, ConditionTuple, ReturnList]
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  let collect = env.value(thisTuple.items[0]);
-  const subgoal = env.value(thisTuple.items[1]) as Tuple;
-  const into = env.value(thisTuple.items[2]);
+  let collect = env.value(thisTuple.items[1]);
+  const subgoal = env.value(thisTuple.items[2]) as Tuple;
+  const into = env.value(thisTuple.items[3]);
   collect = renameVariable(collect, level, thisTuple);
-  const newGoals = [new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple)];
+  const newGoals = [new Tuple(renameVariables(subgoal.items, level, thisTuple), thisTuple)];
 
   // Prove this subgoal, collecting up the environments...
   const answers = [] as AnswerList;
@@ -803,7 +795,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
 
   // Turn anslist into a proper list and unify with 'into' // optional here: nothing anslist -> fail?
   let cons: TupleItem = new Literal(ops.nothing);
-  for (let i = answers.length; i > 0; i--) cons = new Tuple(ops.cons, [answers[i - 1], cons]);
+  for (let i = answers.length; i > 0; i--) cons = new Tuple([new Literal(ops.cons), answers[i - 1], cons]);
 
   const env2 = env.unify(into, cons);
   if (env2 == null) return consoleOutError(null, "[bagof] cannot unify final noun with", into.print()) || true;
@@ -832,22 +824,22 @@ function ExternalJsTupleItem(thisTuple: Tuple, goals: Tuple[], env: Environment,
 }
 function ExternalJS(toLiteral: boolean, term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Get the first tuple, the template.
-  const template = env.value(term.items[0]);
+  const template = env.value(term.items[1]);
   const regresult = template.name.match(/^"(.*)"$/);
   if (template.type != "Literal" || !regresult)
-    return consoleOutError(null, 'First noun of [External] must be a regex in "double quotes" not', template.name) || true;
+    return consoleOutError(null, 'First noun of [External] must be a string in "double quotes" not', template.name) || true;
 
   let jsCommand = regresult[1];
 
   // Get the second tuple, the argument list.
-  let currentLinkedListNode: TupleItem = env.value(term.items[1]);
+  let currentLinkedListNode: TupleItem = env.value(term.items[2]) as Tuple;
   let i = 1;
   while (currentLinkedListNode.name == ops.cons && currentLinkedListNode.type == "Tuple") {
-    const arg = env.value(currentLinkedListNode.items[0]);
+    const arg = env.value(currentLinkedListNode.items[1]);
     if (arg.type != "Literal") return consoleOutError(null, "Second noun of [External] must contain all literals. #" + i, "is a", arg.print()) || true;
     const re = new RegExp("\\$" + i, "g"); // replace $1, $2, etc with values of passed-in params
     jsCommand = jsCommand.replace(re, arg.name);
-    currentLinkedListNode = currentLinkedListNode.items[1];
+    currentLinkedListNode = currentLinkedListNode.items[2];
     i++;
   }
   if (currentLinkedListNode.type != "Literal" || currentLinkedListNode.name != ops.nothing)
@@ -860,7 +852,7 @@ function ExternalJS(toLiteral: boolean, term: Tuple, goals: Tuple[], env: Enviro
 
   // Convert back into an literal or tupleitem...
   const part = toLiteral ? new Literal(jsReturnValue) : Tuple.parseItem(new Tokeniser(jsReturnValue));
-  const env2 = env.unify(term.items[2], part!);
+  const env2 = env.unify(term.items[3], part!);
   if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", jsReturnValue);
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
