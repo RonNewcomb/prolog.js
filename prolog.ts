@@ -792,7 +792,7 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
   if (second.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", second.name, "is a ", second.type) || true;
   const cmp = first.name < second.name ? "lt" : first.name > second.name ? "gt" : "eq";
   const env2 = environment.unify(thisTuple.items[2], new Literal(cmp));
-  if (env2 == null) return consoleOutError(null, "[Comparitor] cannot unify CmpValue with", cmp) || true;
+  if (env2 == null) return consoleOutError(null, "[Comparitor] cannot unify final noun with", cmp) || true;
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
@@ -807,24 +807,24 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   const newGoals = [new Tuple(subgoal.name, renameVariables(subgoal.items, level, thisTuple), thisTuple)];
 
   // Prove this subgoal, collecting up the environments...
-  const anslist = [] as AnswerList;
-  anslist.renumber = -1;
-  answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, anslist));
+  const answers = [] as AnswerList;
+  answers.renumber = -1;
+  answerQuestion(newGoals, env, db, level + 1, BagOfCollectFunction(collect, answers));
 
   // Turn anslist into a proper list and unify with 'into' // optional here: nothing anslist -> fail?
-  let answers: TupleItem = new Literal(ops.nothing);
-  for (let i = anslist.length; i > 0; i--) answers = new Tuple(ops.cons, [anslist[i - 1], answers]);
+  let cons: TupleItem = new Literal(ops.nothing);
+  for (let i = answers.length; i > 0; i--) cons = new Tuple(ops.cons, [answers[i - 1], cons]);
 
-  const env2 = env.unify(into, answers);
-  if (env2 == null) return consoleOutError(null, "[bagof] cannot unify anslist with", into.print()) || true;
+  const env2 = env.unify(into, cons);
+  if (env2 == null) return consoleOutError(null, "[bagof] cannot unify final noun with", into.print()) || true;
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
 // Aux function: return the onReport to use with a bagof subgoal
-function BagOfCollectFunction(collect: TupleItem, anslist: AnswerList): ReportFunction {
+function BagOfCollectFunction(collecting: TupleItem, anslist: AnswerList): ReportFunction {
   return function (env: Environment) {
     // Rename this appropriately and throw it into anslist
-    anslist[anslist.length] = renameVariable(env.value(collect), anslist.renumber!--) as TupleItem;
+    anslist[anslist.length] = renameVariable(env.value(collecting), anslist.renumber!--) as TupleItem;
   };
 }
 
