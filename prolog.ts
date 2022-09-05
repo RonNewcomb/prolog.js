@@ -775,7 +775,7 @@ function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   return true; // TODO shouldn't this return True or something?
 }
 
-// Given a single argument, it sticks it on the goal list.
+// [call, X].  Given a single argument, it sticks it on the goal list.
 function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first: TupleItem = env.value(thisTuple.items[0]);
   if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
@@ -784,7 +784,7 @@ function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   return answerQuestion(newGoals, env, db, level + 1, onReport);
 }
 
-// compare(First, Second, CmpValue) // First, Second must be bound to strings here. // CmpValue is bound to -1, 0, 1
+// [compare, First: string|number, Second: string|number, CmpValue: gt|eq|lt]
 function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first = environment.value(thisTuple.items[0]);
   if (first.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type) || true;
@@ -798,7 +798,7 @@ function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, 
 
 type AnswerList = TupleItem[] & { renumber?: number };
 
-// bagof(Tuple, ConditionTuple, ReturnList)
+// [bagof, Tuple, ConditionTuple, ReturnList]
 function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   let collect = env.value(thisTuple.items[0]);
   const subgoal = env.value(thisTuple.items[1]) as Tuple;
@@ -828,9 +828,10 @@ function BagOfCollectFunction(collecting: TupleItem, anslist: AnswerList): Repor
   };
 }
 
-// Call out to external javascript
-// external/3 takes three arguments:
-// first: a template string that uses $1, $2, etc. as placeholders for
+// [external, "console.log($1, $2)", {X,Y}, Result].   // Calls out to external javascript
+// arg1: a template string that uses $1, $2, etc. as placeholders
+// arg2: a list of values  // a cons linked-list
+// arg3: return value from javascript, if any
 const EvalContext: any[] = [];
 
 function ExternalJsLiteral(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
@@ -839,45 +840,38 @@ function ExternalJsLiteral(thisTuple: Tuple, goals: Tuple[], env: Environment, d
 function ExternalJsTupleItem(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   return ExternalJS(false, thisTuple, goals, env, db, level, onReport);
 }
-function ExternalJS(
-  toLiteral: boolean,
-  thisTuple: Tuple,
-  goals: Tuple[],
-  env: Environment,
-  db: Database,
-  level: number,
-  onReport: ReportFunction
-): FunctorResult {
+function ExternalJS(toLiteral: boolean, term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Get the first tuple, the template.
-  const template = env.value(thisTuple.items[0]);
+  const template = env.value(term.items[0]);
   const regresult = template.name.match(/^"(.*)"$/);
   if (template.type != "Literal" || !regresult)
-    return consoleOutError(null, 'First noun of [ExternalJS] must be a regex in "double quotes" not', template.name) || true;
+    return consoleOutError(null, 'First noun of [External] must be a regex in "double quotes" not', template.name) || true;
 
-  let r = regresult[1];
+  let jsCommand = regresult[1];
 
   // Get the second tuple, the argument list.
-  let second: TupleItem = env.value(thisTuple.items[1]);
+  let currentLinkedListNode: TupleItem = env.value(term.items[1]);
   let i = 1;
-  while (second.type == "Tuple" && second.name == ops.cons) {
-    const arg = env.value(second.items[0]);
+  while (currentLinkedListNode.name == ops.cons && currentLinkedListNode.type == "Tuple") {
+    const arg = env.value(currentLinkedListNode.items[0]);
     if (arg.type != "Literal") return consoleOutError(null, "Second noun of [External] must contain all literals. #" + i, "is a", arg.print()) || true;
     const re = new RegExp("\\$" + i, "g"); // replace $1, $2, etc with values of passed-in params
-    r = r.replace(re, arg.name);
-    second = second.items[1];
+    jsCommand = jsCommand.replace(re, arg.name);
+    currentLinkedListNode = currentLinkedListNode.items[1];
     i++;
   }
-  if (second.type != "Literal" || second.name != ops.nothing) return consoleOutError(null, "[External] second noun must be a list, not", second.print());
+  if (currentLinkedListNode.type != "Literal" || currentLinkedListNode.name != ops.nothing)
+    return consoleOutError(null, "Second noun of [External] must be a {...} list, not", currentLinkedListNode.print());
 
-  let ret: string;
+  let jsReturnValue: string;
   // @ts-ignore
-  with (EvalContext) ret = eval(r);
-  if (!ret) ret = ops.nothing;
+  with (EvalContext) jsReturnValue = eval(jsCommand);
+  if (!jsReturnValue) jsReturnValue = ops.nothing;
 
   // Convert back into an literal or tupleitem...
-  const part = toLiteral ? new Literal(ret) : Tuple.parseItem(new Tokeniser(ret));
-  const env2 = env.unify(thisTuple.items[2], part!);
-  if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", ret);
+  const part = toLiteral ? new Literal(jsReturnValue) : Tuple.parseItem(new Tokeniser(jsReturnValue));
+  const env2 = env.unify(term.items[2], part!);
+  if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", jsReturnValue);
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
