@@ -111,7 +111,7 @@ function init() {
   database.builtin["compare/3"] = Comparitor;
   database.builtin[ops.cutCommit + "/0"] = Commit;
   database.builtin["ask/1"] = Ask;
-  database.builtin[ops.failRollbackMoreAgain + "/0"] = Fail;
+  database.builtin[ops.failRollbackMoreAgain + "/0"] = More;
   database.builtin["bagof/3"] = BagOf;
   database.builtin["javascript/3"] = ExternalJsLiteral;
   database.builtin["javascript2/3"] = ExternalJsTupleItem;
@@ -617,7 +617,7 @@ class Tokeniser {
   constructor(line: string) {
     this.remainder = line;
     this.current = "";
-    this.type = ""; // "eof", "id", "var", "punc" etc.
+    this.type = "";
     this.contexts = [];
     this.consume(); // Load up the first token.
   }
@@ -746,8 +746,8 @@ function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: 
   return ret;
 }
 
-function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
-  return true; // TODO shouldn't this return True or something?
+function More(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+  return null; // TODO shouldn't this return True or something?
 }
 
 // [ask, X].  Given a single argument, it sticks it on the goal list.

@@ -171,13 +171,18 @@
 [holds, "envelope", 1, yes].
 [holds, a container, a capacity, any whether]?
 
+[holds, "bucket", 834, yes]?
+[not, [holds, "bucket", 834, yes]]?
+[holds, "bucket", 76, yes]?
+[not, [holds, "bucket", 76, yes]]?
+
 </textarea
       >
     </form>
     <form name="input" action="javascript:return false;" class="toolbar">
       <input type="checkbox" name="showparse" checked onclick="toggleEcholines()" id="showparse" /> <label for="showparse">Show parse results</label>
     </form>
-    <div id="consoleout">
+    <div id="consoleout" ondblclick="document.getElementById('commandline').focus()">
       <div></div>
     </div>
     <input type="text" id="commandline" onkeydown="onCommandlineKey(event, this);" style="width: 100%" />

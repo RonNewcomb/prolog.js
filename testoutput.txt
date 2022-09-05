@@ -176,3 +176,15 @@ The whether is no.
 The container is "envelope".
 The capacity is 1.
 The whether is yes.
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[not, [holds, "bucket", 834, yes]]?
+[not, [holds, "bucket", 834, yes]] ?
+No.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[not, [holds, "bucket", 76, yes]]?
+[not, [holds, "bucket", 76, yes]] ?
+Yes.
