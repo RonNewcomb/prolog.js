@@ -110,11 +110,11 @@ function init() {
   database.builtin = {};
   database.builtin["compare/3"] = Comparitor;
   database.builtin[ops.cutCommit + "/0"] = Commit;
-  database.builtin["call/1"] = Call;
-  database.builtin["fail/0"] = Fail;
+  database.builtin["ask/1"] = Ask;
+  database.builtin[ops.failRollbackMoreAgain + "/0"] = Fail;
   database.builtin["bagof/3"] = BagOf;
-  database.builtin["external/3"] = ExternalJsLiteral;
-  database.builtin["external2/3"] = ExternalJsTupleItem;
+  database.builtin["javascript/3"] = ExternalJsLiteral;
+  database.builtin["javascript2/3"] = ExternalJsTupleItem;
   printAnswerline("Attachments done.\n");
 
   printAnswerline("Parsing rulesets.\n");
@@ -160,15 +160,6 @@ class Environment {
     this.contents = Object.create(oldEnvironment?.contents || null);
   }
 
-  // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
-  spawn(name: string, part: TupleItem): Environment {
-    // We assume that name has been 'unwound' or 'followed' as far as possible
-    // in the environment. If this is not the case, we could get an alias loop.
-    const newEnv = new Environment(this);
-    newEnv.contents[name] = part;
-    return newEnv;
-  }
-
   // Print out an environment's contents.
   print() {
     if (!this.contents) return printAnswerline("Empty.\n");
@@ -189,9 +180,7 @@ class Environment {
           continue;
         case "Tuple":
           const nestedVariables = Environment.varNames(part.items);
-          for (const nestedVariable of nestedVariables) {
-            if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
-          }
+          for (const nestedVariable of nestedVariables) if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
           continue;
       }
     }
@@ -218,6 +207,15 @@ class Environment {
     printAnswerline(retval.join(""));
   }
 
+  // Give a new environment from the old with "name" (a string variable name) bound to "part" (a part)
+  spawn(name: string, part: TupleItem): Environment {
+    // We assume that name has been 'unwound' or 'followed' as far as possible
+    // in the environment. If this is not the case, we could get an alias loop.
+    const newEnv = new Environment(this);
+    newEnv.contents[name] = part;
+    return newEnv;
+  }
+
   // The value of x in a given environment
   value(x: TupleItem): TupleItem {
     switch (x.type) {
@@ -232,10 +230,7 @@ class Environment {
     }
   }
 
-  // More substantial utility functions.
-
-  // Unify two tuples in the current environment. Returns a new environment.
-  // On failure, returns null.
+  // Unify two items under the current environment. Returns a new environment, or null on failure
   unify(x: TupleItem, y: TupleItem): Environment | null {
     x = this.value(x);
     y = this.value(y);
@@ -261,9 +256,7 @@ class Environment {
 
 // Go through a tuple's terms renaming variables by appending 'level' to each variable name.
 // "parent" points to the subgoal, the expansion of which led to these tuples.
-function renameVariables(items: TupleItem[], level: number, parent?: Tuple): TupleItem[] {
-  return items.map(item => renameVariable(item, level, parent));
-}
+const renameVariables = (items: TupleItem[], level: number, parent?: Tuple): TupleItem[] => items.map(item => renameVariable(item, level, parent));
 function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): TupleItem {
   switch (rvalue.type) {
     case "Literal":
@@ -757,8 +750,8 @@ function Fail(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
   return true; // TODO shouldn't this return True or something?
 }
 
-// [call, X].  Given a single argument, it sticks it on the goal list.
-function Call(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+// [ask, X].  Given a single argument, it sticks it on the goal list.
+function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first: TupleItem = env.value(thisTuple.items[1]);
   if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
   first.parent = thisTuple;

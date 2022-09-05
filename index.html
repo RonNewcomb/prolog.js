@@ -98,17 +98,17 @@
 
 # [ a, b, c ] --> [conjunction, {a, b, c}]
 [conjunction, {}].
-[conjunction, {an xxx | the rest}] if [call, an xxx], [conjunction, the rest].
+[conjunction, {an xxx | the rest}] if [ask, an xxx], [conjunction, the rest].
 
 # [ a; b; c ] --> [disjunction, {a, b, c}]
-[disjunction, {an xxx | the rest}] if [call, an xxx].
+[disjunction, {an xxx | the rest}] if [ask, an xxx].
 [disjunction, {an xxx | the rest}] if [disjunction, the rest].
 
 # arithmetic
-[add, an aaa, a bbb, the sum] if [external, "$1 + $2", {an aaa, a bbb}, the sum].   # an aaa + a bbb = the ccc, etc.
-[sub, an aaa, a bbb, the difference] if [external, "$1 - $2", {an aaa, a bbb}, the difference].
-[mul, an aaa, a bbb, the product] if [external, "$1 * $2", {an aaa, a bbb}, the product].
-[div, an aaa, a bbb, the quotient] if [external, "$1 / $2", {an aaa, a bbb}, the quotient].
+[add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum].   # an aaa + a bbb = the ccc, etc.
+[sub, an aaa, a bbb, the difference] if [javascript, "$1 - $2", {an aaa, a bbb}, the difference].
+[mul, an aaa, a bbb, the product] if [javascript, "$1 * $2", {an aaa, a bbb}, the product].
+[div, an aaa, a bbb, the quotient] if [javascript, "$1 / $2", {an aaa, a bbb}, the quotient].
 
 # The canonical quicksort
 [qsort, {}, {}].
@@ -132,7 +132,7 @@
 [length, {an hhhh|the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn].
 
 # Standard prolog not/1
-[not, the tttterm] if [call, the tttterm], commit, [fail].
+[not, the tttterm] if [ask, the tttterm], commit, get_more.
 [not, the tttterm].
 
 # Standard prolog var/1

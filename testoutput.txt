@@ -13,28 +13,28 @@ Memorized.
 [conjunction, {}].
 [conjunction, nothing] .
 Memorized.
-[conjunction, {an xxx | the rest}] if [call, an xxx], [conjunction, the rest].
-[conjunction, {the xxx | the rest}] if [call, the xxx], [conjunction, the rest] .
+[conjunction, {an xxx | the rest}] if [ask, an xxx], [conjunction, the rest].
+[conjunction, {the xxx | the rest}] if [ask, the xxx], [conjunction, the rest] .
 Memorized.
 # [ a; b; c ] --> [disjunction, {a, b, c}]
-[disjunction, {an xxx | the rest}] if [call, an xxx].
-[disjunction, {the xxx | the rest}] if [call, the xxx] .
+[disjunction, {an xxx | the rest}] if [ask, an xxx].
+[disjunction, {the xxx | the rest}] if [ask, the xxx] .
 Memorized.
 [disjunction, {an xxx | the rest}] if [disjunction, the rest].
 [disjunction, {the xxx | the rest}] if [disjunction, the rest] .
 Memorized.
 # arithmetic
-[add, an aaa, a bbb, the sum] if [external, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
-[add, the aaa, the bbb, the sum] if [external, "$1 + $2", {the aaa, the bbb}, the sum] .
+[add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
+[add, the aaa, the bbb, the sum] if [javascript, "$1 + $2", {the aaa, the bbb}, the sum] .
 Memorized.
-[sub, an aaa, a bbb, the difference] if [external, "$1 - $2", {an aaa, a bbb}, the difference].
-[sub, the aaa, the bbb, the difference] if [external, "$1 - $2", {the aaa, the bbb}, the difference] .
+[sub, an aaa, a bbb, the difference] if [javascript, "$1 - $2", {an aaa, a bbb}, the difference].
+[sub, the aaa, the bbb, the difference] if [javascript, "$1 - $2", {the aaa, the bbb}, the difference] .
 Memorized.
-[mul, an aaa, a bbb, the product] if [external, "$1 * $2", {an aaa, a bbb}, the product].
-[mul, the aaa, the bbb, the product] if [external, "$1 * $2", {the aaa, the bbb}, the product] .
+[mul, an aaa, a bbb, the product] if [javascript, "$1 * $2", {an aaa, a bbb}, the product].
+[mul, the aaa, the bbb, the product] if [javascript, "$1 * $2", {the aaa, the bbb}, the product] .
 Memorized.
-[div, an aaa, a bbb, the quotient] if [external, "$1 / $2", {an aaa, a bbb}, the quotient].
-[div, the aaa, the bbb, the quotient] if [external, "$1 / $2", {the aaa, the bbb}, the quotient] .
+[div, an aaa, a bbb, the quotient] if [javascript, "$1 / $2", {an aaa, a bbb}, the quotient].
+[div, the aaa, the bbb, the quotient] if [javascript, "$1 / $2", {the aaa, the bbb}, the quotient] .
 Memorized.
 # The canonical quicksort
 [qsort, {}, {}].
@@ -81,8 +81,8 @@ Memorized.
 [length, {the hhhh | the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn] .
 Memorized.
 # Standard prolog not/1
-[not, the tttterm] if [call, the tttterm], commit, [fail].
-[not, the tttterm] if [call, the tttterm], [commit], [fail] .
+[not, the tttterm] if [ask, the tttterm], commit, get_more.
+[not, the tttterm] if [ask, the tttterm], [commit], [get_more] .
 Memorized.
 [not, the tttterm].
 [not, the tttterm] .
