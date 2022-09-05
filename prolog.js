@@ -825,7 +825,7 @@ function ExternalJS(thisTuple, goals, env, db, level, onReport) {
     let ret;
     // @ts-ignore
     with (EvalContext)
-        ret = eval(r);
+    ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
         ret = "nothing" /* ops.nothing */;
@@ -876,7 +876,7 @@ function ExternalAndParse(thisTuple, goals, env, db, level, onReport) {
     let ret;
     // @ts-ignore
     with (EvalContext)
-        ret = eval(r);
+    ret = eval(r);
     //print("DEBUG: External/3 got "+ret+" back\n");
     if (!ret)
         ret = "nothing" /* ops.nothing */;
