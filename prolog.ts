@@ -412,7 +412,7 @@ class Tuple {
     // while not ] parse items
     const parts: TupleItem[] = [];
     while (tk.current != ops.close) {
-      if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tuples until", ops.close);
+      if (tk.type == "eof") return consoleOutError(tk, "unexpected EOF while running through tupleitems for", name);
 
       const part = Tuple.parseItem(tk);
       if (part == null) return consoleOutError(tk, "part didn't parse at", tk.current, " but instead got");
@@ -553,7 +553,7 @@ class Rule {
   static parse(tk: Tokeniser): Rule | null {
     tk.contextPush("rule");
     const head = Tuple.parse(tk);
-    if (!head) return consoleOutError(tk, "syntax error");
+    if (!head) return consoleOutError(tk, "syntax error while parsing", tk.contexts.pop());
 
     const expected = [ops.if, ops.endQuestion, ops.endSentence, ops.bodyTupleSeparator];
     const questionIsImplied = hasTheImpliedUnboundVar(head);
@@ -632,7 +632,7 @@ class Tokeniser {
   remainder: string;
   current: string;
   type: "" | "eof" | "id" | "var" | "punc";
-  contexts: string[];
+  contexts: ("tuple" | "tupleitem" | "list" | "rule")[];
 
   constructor(line: string) {
     this.remainder = line;
@@ -697,8 +697,11 @@ class Tokeniser {
     }
 
     // variable    including ? as varName
-    if (window.newVars) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
-    else r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
+    if (!window.newVars) r = this.remainder.match(/^([A-Z_][a-zA-Z0-9_]*|\?)(.*)$/);
+    else {
+      if (context == "tuple") r = this.remainder.match(/^(\?)(.*)$/);
+      if (!r) r = this.remainder.match(/^(?:the|a|an|any)\s+([a-zA-Z0-9_]+)(.*)$/);
+    }
     if (r) {
       this.remainder = r[2];
       this.current = r[1];
@@ -753,7 +756,7 @@ class Tokeniser {
 
     // eof?
     this.current = "";
-    if (this.remainder) consoleOutError(this, "Cannot recognize this");
+    if (this.remainder) consoleOutError(this, "Tokenizer doesn't recognize this while parsing a", context);
     this.type = "eof";
     return this;
   }

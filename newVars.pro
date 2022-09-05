@@ -13,10 +13,10 @@
 [disjunction, {an xxx | the rest}] if [disjunction, the rest].
 
 # arithmetic
-[add, an aaa, a bbb, C] if [external, "$1 + $2", {an aaa, a bbb}, C].   # an aaa + a bbb = C, etc.
-[sub, an aaa, a bbb, C] if [external, "$1 - $2", {an aaa, a bbb}, C].
-[mul, an aaa, a bbb, C] if [external, "$1 * $2", {an aaa, a bbb}, C].
-[div, an aaa, a bbb, C] if [external, "$1 / $2", {an aaa, a bbb}, C].
+[add, an aaa, a bbb, the sum] if [external, "$1 + $2", {an aaa, a bbb}, the sum].   # an aaa + a bbb = the ccc, etc.
+[sub, an aaa, a bbb, the difference] if [external, "$1 - $2", {an aaa, a bbb}, the difference].
+[mul, an aaa, a bbb, the product] if [external, "$1 * $2", {an aaa, a bbb}, the product].
+[div, an aaa, a bbb, the quotient] if [external, "$1 / $2", {an aaa, a bbb}, the quotient].
 
 # The canonical quicksort
 [qsort, {}, {}].
@@ -71,7 +71,7 @@
 [holds, "bucket", 834, yes]?
 [holds, "bucket", 76, yes]?
 [holds, "bucket", the capacity, yes]?
-[holds, "bucket", the capacity, yes]
+#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
 [holds, "bucket", ?, yes]
 [holds, "box", 411, no].
 [holds, "envelope", 1, yes].

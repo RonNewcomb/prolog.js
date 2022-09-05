@@ -72,6 +72,8 @@
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes]?
 [holds, "bucket", 76, yes]?
+[holds, "bucket", the capacity, yes]?
+#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
 [holds, "bucket", ?, yes]
 [holds, "box", 411, no].
 [holds, "envelope", 1, yes].
