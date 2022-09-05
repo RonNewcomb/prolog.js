@@ -333,7 +333,7 @@ class Variable {
     this.name = head;
   }
   print(): string {
-    return "The " + this.name;
+    return "the " + this.name;
   }
 }
 

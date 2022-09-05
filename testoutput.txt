@@ -7,89 +7,89 @@ Parsing rulesets.
 ### Accumulated standard library lives under here!
 # unification and [ x, y, z; w ] support
 [unify, an xxx, an xxx].
-[unify, The xxx, The xxx] .
+[unify, the xxx, the xxx] .
 Memorized.
 # [ a, b, c ] --> [conjunction, {a, b, c}]
 [conjunction, {}].
 [conjunction, nothing] .
 Memorized.
 [conjunction, {an xxx | the rest}] if [call, an xxx], [conjunction, the rest].
-[conjunction, {The xxx | The rest}] if [call, The xxx], [conjunction, The rest] .
+[conjunction, {the xxx | the rest}] if [call, the xxx], [conjunction, the rest] .
 Memorized.
 # [ a; b; c ] --> [disjunction, {a, b, c}]
 [disjunction, {an xxx | the rest}] if [call, an xxx].
-[disjunction, {The xxx | The rest}] if [call, The xxx] .
+[disjunction, {the xxx | the rest}] if [call, the xxx] .
 Memorized.
 [disjunction, {an xxx | the rest}] if [disjunction, the rest].
-[disjunction, {The xxx | The rest}] if [disjunction, The rest] .
+[disjunction, {the xxx | the rest}] if [disjunction, the rest] .
 Memorized.
 # arithmetic
 [add, an aaa, a bbb, the sum] if [external, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
-[add, The aaa, The bbb, The sum] if [external, "$1 + $2", {The aaa, The bbb}, The sum] .
+[add, the aaa, the bbb, the sum] if [external, "$1 + $2", {the aaa, the bbb}, the sum] .
 Memorized.
 [sub, an aaa, a bbb, the difference] if [external, "$1 - $2", {an aaa, a bbb}, the difference].
-[sub, The aaa, The bbb, The difference] if [external, "$1 - $2", {The aaa, The bbb}, The difference] .
+[sub, the aaa, the bbb, the difference] if [external, "$1 - $2", {the aaa, the bbb}, the difference] .
 Memorized.
 [mul, an aaa, a bbb, the product] if [external, "$1 * $2", {an aaa, a bbb}, the product].
-[mul, The aaa, The bbb, The product] if [external, "$1 * $2", {The aaa, The bbb}, The product] .
+[mul, the aaa, the bbb, the product] if [external, "$1 * $2", {the aaa, the bbb}, the product] .
 Memorized.
 [div, an aaa, a bbb, the quotient] if [external, "$1 / $2", {an aaa, a bbb}, the quotient].
-[div, The aaa, The bbb, The quotient] if [external, "$1 / $2", {The aaa, The bbb}, The quotient] .
+[div, the aaa, the bbb, the quotient] if [external, "$1 / $2", {the aaa, the bbb}, the quotient] .
 Memorized.
 # The canonical quicksort
 [qsort, {}, {}].
 [qsort, nothing, nothing] .
 Memorized.
 [qsort, {an xxx|the rest}, an aaanswer] if [partition, an xxx, the rest, {}, a bbbefore, {}, an aaafter], [qsort, a bbbefore, a bbbsort], [qsort, an aaafter, an aaasort], [append, a bbbsort, {an xxx | an aaasort}, an aaanswer].
-[qsort, {The xxx | The rest}, The aaanswer] if [partition, The xxx, The rest, nothing, The bbbefore, nothing, The aaafter], [qsort, The bbbefore, The bbbsort], [qsort, The aaafter, The aaasort], [append, The bbbsort, {The xxx | The aaasort}, The aaanswer] .
+[qsort, {the xxx | the rest}, the aaanswer] if [partition, the xxx, the rest, nothing, the bbbefore, nothing, the aaafter], [qsort, the bbbefore, the bbbsort], [qsort, the aaafter, the aaasort], [append, the bbbsort, {the xxx | the aaasort}, the aaanswer] .
 Memorized.
 [partition, an xxx, {}, a bbbefore, a bbbefore, an aaafter, an aaafter].
-[partition, The xxx, nothing, The bbbefore, The bbbefore, The aaafter, The aaafter] .
+[partition, the xxx, nothing, the bbbefore, the bbbefore, the aaafter, the aaafter] .
 Memorized.
 [partition, an xxx, {a yyy | the rest}, a bbb, {a yyy | a bbbrest}, an aaa, an aaarest] if [leq, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-[partition, The xxx, {The yyy | The rest}, The bbb, {The yyy | The bbbrest}, The aaa, The aaarest] if [leq, The xxx, The yyy], [partition, The xxx, The rest, The bbb, The bbbrest, The aaa, The aaarest] .
+[partition, the xxx, {the yyy | the rest}, the bbb, {the yyy | the bbbrest}, the aaa, the aaarest] if [leq, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
 Memorized.
 [partition, an xxx, {a yyy | the rest}, a bbb, a bbbrest, an aaa, {a yyy | an aaarest}] if [gtr, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-[partition, The xxx, {The yyy | The rest}, The bbb, The bbbrest, The aaa, {The yyy | The aaarest}] if [gtr, The xxx, The yyy], [partition, The xxx, The rest, The bbb, The bbbrest, The aaa, The aaarest] .
+[partition, the xxx, {the yyy | the rest}, the bbb, the bbbrest, the aaa, {the yyy | the aaarest}] if [gtr, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
 Memorized.
 [leq, an xxx, a yyy] if [compare, an xxx, a yyy, gt].
-[leq, The xxx, The yyy] if [compare, The xxx, The yyy, gt] .
+[leq, the xxx, the yyy] if [compare, the xxx, the yyy, gt] .
 Memorized.
 [leq, an xxx, a yyy] if [compare, an xxx, a yyy, eq].
-[leq, The xxx, The yyy] if [compare, The xxx, The yyy, eq] .
+[leq, the xxx, the yyy] if [compare, the xxx, the yyy, eq] .
 Memorized.
 [gtr, an xxx, a yyy] if [compare, an xxx, a yyy, lt].
-[gtr, The xxx, The yyy] if [compare, The xxx, The yyy, lt] .
+[gtr, the xxx, the yyy] if [compare, the xxx, the yyy, lt] .
 Memorized.
 # Some list-processing stuff...
 [append, {}, a zzzz, a zzzz].
-[append, nothing, The zzzz, The zzzz] .
+[append, nothing, the zzzz, the zzzz] .
 Memorized.
 [append, {an aaa|a bbb}, a zzzz, {an aaa|the differentz}] if [append, a bbb, a zzzz, the differentz].
-[append, {The aaa | The bbb}, The zzzz, {The aaa | The differentz}] if [append, The bbb, The zzzz, The differentz] .
+[append, {the aaa | the bbb}, the zzzz, {the aaa | the differentz}] if [append, the bbb, the zzzz, the differentz] .
 Memorized.
 [reverse, {}, {}].
 [reverse, nothing, nothing] .
 Memorized.
 [reverse, {an aaa|a bbb}, a zzzz] if [reverse, a bbb, a bbbrev], [append, a bbbrev, {an aaa}, a zzzz].
-[reverse, {The aaa | The bbb}, The zzzz] if [reverse, The bbb, The bbbrev], [append, The bbbrev, {The aaa}, The zzzz] .
+[reverse, {the aaa | the bbb}, the zzzz] if [reverse, the bbb, the bbbrev], [append, the bbbrev, {the aaa}, the zzzz] .
 Memorized.
 [length, {}, 0].
 [length, nothing, 0] .
 Memorized.
 [length, {an hhhh|the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn].
-[length, {The hhhh | The tttt}, The nnn] if [length, The tttt, The mmm], [add, The mmm, 1, The nnn] .
+[length, {the hhhh | the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn] .
 Memorized.
 # Standard prolog not/1
 [not, the tttterm] if [call, the tttterm], commit, [fail].
-[not, The tttterm] if [call, The tttterm], [commit], [fail] .
+[not, the tttterm] if [call, the tttterm], [commit], [fail] .
 Memorized.
 [not, the tttterm].
-[not, The tttterm] .
+[not, the tttterm] .
 Memorized.
 # Standard prolog var/1
 [var, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
-[var, The xxx] if [bagof, l, [varTest, The xxx], {l, l}] .
+[var, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
 Memorized.
 [varTest, a].
 [varTest, a] .
@@ -122,19 +122,19 @@ Memorized.
 [triple, type, sc, transitive] .
 Memorized.
 [triple, the ppl, an xxx, a yyy] if dontSelfRecurse:[triple, type, the ppl, transitive], dontSelfRecurse:[triple, the ppl, an xxx, a zzzz], [triple, the ppl, a zzzz, a yyy].
-[triple, The ppl, The xxx, The yyy] if [triple, type, The ppl, transitive], [triple, The ppl, The xxx, The zzzz], [triple, The ppl, The zzzz, The yyy] .
+[triple, the ppl, the xxx, the yyy] if [triple, type, the ppl, transitive], [triple, the ppl, the xxx, the zzzz], [triple, the ppl, the zzzz, the yyy] .
 Memorized.
 [arcsOut, an xxx, the lost] if [bagof, the oolong, [triple, the ppl, an xxx, the oolong], the lost].
-[arcsOut, The xxx, The lost] if [bagof, The oolong, [triple, The ppl, The xxx, The oolong], The lost] .
+[arcsOut, the xxx, the lost] if [bagof, the oolong, [triple, the ppl, the xxx, the oolong], the lost] .
 Memorized.
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]? # L should have 21 elements
-[bagof, c, [triple, sc, The aaa, The bbb], The lost], [length, The lost, The nnn] ?
+[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
 The aaa is anything.
 The bbb is anything.
 The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
 The nnn is 21.
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
-[bagof, c, [triple, sc, The aaa, The bbb], The lost], [length, The lost, The nnn] ?
+[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
 The aaa is anything.
 The bbb is anything.
 The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
@@ -153,11 +153,11 @@ Yes.
 [holds, "bucket", 76, yes] ?
 No.
 [holds, "bucket", the capacity, yes]?
-[holds, "bucket", The capacity, yes] ?
+[holds, "bucket", the capacity, yes] ?
 The capacity is 834.
 #[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
 [holds, "bucket", ?, yes]
-[holds, "bucket", The ?, yes] ?
+[holds, "bucket", the ?, yes] ?
 834.
 [holds, "box", 411, no].
 [holds, "box", 411, no] .
@@ -166,7 +166,7 @@ Memorized.
 [holds, "envelope", 1, yes] .
 Memorized.
 [holds, a container, a capacity, any whether]?
-[holds, The container, The capacity, The whether] ?
+[holds, the container, the capacity, the whether] ?
 The container is "bucket".
 The capacity is 834.
 The whether is yes.
