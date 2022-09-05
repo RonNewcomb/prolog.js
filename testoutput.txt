@@ -9,19 +9,19 @@ Parsing rulesets.
 [unify, an xxx, an xxx].
 [unify, the xxx, the xxx] .
 Memorized.
-# [ a, b, c ] --> [conjunction, {a, b, c}]
-[conjunction, {}].
-[conjunction, nothing] .
+# [ a, b, c ] --> [and, {a, b, c}]
+[and, {}].
+[and, nothing] .
 Memorized.
-[conjunction, {an xxx | the rest}] if [ask, an xxx], [conjunction, the rest].
-[conjunction, {the xxx | the rest}] if [ask, the xxx], [conjunction, the rest] .
+[and, {a question | the rest}] if [ask, the question], [and, the rest].
+[and, {the question | the rest}] if [ask, the question], [and, the rest] .
 Memorized.
-# [ a; b; c ] --> [disjunction, {a, b, c}]
-[disjunction, {an xxx | the rest}] if [ask, an xxx].
-[disjunction, {the xxx | the rest}] if [ask, the xxx] .
+# [ a; b; c ] --> [or, {a, b, c}]
+[or, {a question | the alternatives}] if [ask, the question].
+[or, {the question | the alternatives}] if [ask, the question] .
 Memorized.
-[disjunction, {an xxx | the rest}] if [disjunction, the rest].
-[disjunction, {the xxx | the rest}] if [disjunction, the rest] .
+[or, {a question | the alternatives}] if [or, the alternatives].
+[or, {the question | the alternatives}] if [or, the alternatives] .
 Memorized.
 # arithmetic
 [add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
@@ -143,6 +143,7 @@ The nnn is 21.
 expected complex question to end with ? but instead got
 .
  
+# testing basics
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .
 Memorized.
@@ -176,6 +177,7 @@ The whether is no.
 The container is "envelope".
 The capacity is 1.
 The whether is yes.
+# testing NOT
 [holds, "bucket", 834, yes]?
 [holds, "bucket", 834, yes] ?
 Yes.
@@ -188,3 +190,16 @@ No.
 [not, [holds, "bucket", 76, yes]]?
 [not, [holds, "bucket", 76, yes]] ?
 Yes.
+# testing First item not special
+[Bob, dreams, big]
+[Bob, dreams, big] .
+Memorized.
+[?, dreams, big]
+[the ?, dreams, big] ?
+Bob.
+[Bob, ? , big]
+[Bob, the ?, big] ?
+dreams.
+[Bob, dreams, ?]
+[Bob, dreams, the ?] ?
+big.

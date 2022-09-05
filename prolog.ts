@@ -598,7 +598,7 @@ class Rule {
 function hasTheImpliedUnboundVar(tuple: TupleItem): boolean {
   switch (tuple.type) {
     case "Literal":
-      return tuple.name === ops.impliedQuestionVar;
+      return false;
     case "Variable":
       return tuple.name === ops.impliedQuestionVar;
     case "Tuple":
@@ -806,8 +806,6 @@ function BagOfCollectFunction(collecting: TupleItem, anslist: AnswerList): Repor
 // arg1: a template string that uses $1, $2, etc. as placeholders
 // arg2: a list of values  // a cons linked-list
 // arg3: return value from javascript, if any
-const EvalContext: any[] = [];
-
 function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Get the first tuple, the template.
   const template = env.value(term.items[1]);
@@ -833,7 +831,7 @@ function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database,
 
   let jsReturnValue: string;
   // @ts-ignore
-  with (EvalContext) jsReturnValue = eval(jsCommand);
+  with ([]) jsReturnValue = eval(jsCommand);
   if (!jsReturnValue) jsReturnValue = ops.nothing;
 
   // Convert back into an literal or tupleitem...

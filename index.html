@@ -96,13 +96,13 @@
 
 [unify, an xxx, an xxx].
 
-# [ a, b, c ] --> [conjunction, {a, b, c}]
-[conjunction, {}].
-[conjunction, {an xxx | the rest}] if [ask, an xxx], [conjunction, the rest].
+# [ a, b, c ] --> [and, {a, b, c}]
+[and, {}].
+[and, {a question | the rest}] if [ask, the question], [and, the rest].
 
-# [ a; b; c ] --> [disjunction, {a, b, c}]
-[disjunction, {an xxx | the rest}] if [ask, an xxx].
-[disjunction, {an xxx | the rest}] if [disjunction, the rest].
+# [ a; b; c ] --> [or, {a, b, c}]
+[or, {a question | the alternatives}] if [ask, the question].
+[or, {a question | the alternatives}] if [or, the alternatives].
 
 # arithmetic
 [add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum].   # an aaa + a bbb = the ccc, etc.
@@ -161,6 +161,7 @@
 
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
 
+# testing basics
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes]?
 [holds, "bucket", 76, yes]?
@@ -171,10 +172,17 @@
 [holds, "envelope", 1, yes].
 [holds, a container, a capacity, any whether]?
 
+# testing NOT
 [holds, "bucket", 834, yes]?
 [not, [holds, "bucket", 834, yes]]?
 [holds, "bucket", 76, yes]?
 [not, [holds, "bucket", 76, yes]]?
+
+# testing First item not special
+[Bob, dreams, big]
+[?, dreams, big]
+[Bob, ? , big]
+[Bob, dreams, ?]
 
 </textarea
       >
