@@ -87,9 +87,9 @@ Memorized.
 [not, the tttterm].
 [not, the tttterm] .
 Memorized.
-# Standard prolog var/1
-[var, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
-[var, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
+# Standard prolog var/1 = unbound/1
+[unbound, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
+[unbound, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
 Memorized.
 [varTest, a].
 [varTest, a] .
@@ -196,6 +196,13 @@ Yes.
 Memorized.
 [?, dreams, big]
 [the ?, dreams, big] ?
+leq.
+[Comparitor] cannot unify final noun with gt
+ 
+[Comparitor] cannot unify final noun with gt
+ 
+[bagof] cannot unify final noun with big
+ 
 Bob.
 [Bob, ? , big]
 [Bob, the ?, big] ?

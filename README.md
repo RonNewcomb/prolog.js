@@ -308,6 +308,26 @@ Accumulator code to reverse a list
 
 Implementation note on Unification: the order doesn't matter. `x=5, x=y` obviously means y is 5, but also `x=y, ..time passes.., x=5` also means y is 5. `x=y` are both unknown but they're set to the _same_ unknown. This means `unknown` is a type not just a value. Each initialization to `unknown` gets a different, unique instance of `unknown`.
 
+### types
+
+A variable's name may or may not be a type: `a number` is obviously a type, but `a car` may or may not be depending on if `a car` was defined (by `is`?) elsewhere to be a datatype.
+
+Base types have adjective forms that can be useful if multiple vars of the same type appear in a tuple: `[a numeric force, a numeric mass, a numeric acceleration]`.
+
+How much of types are in the compiler and how much are 'just a default library of rules'? We usually attach info with basic facts: `[is, a Chevy, a car]`. But there's a lot of numbers and even more strings to categorize. Looking at an atom, parsing it for surrounding quotes or ensuring all chars are digits can be done with a library rule, but also, might want to have compiler help to be more efficient. The datatypes themselves are atoms/barewords.
+
+```
+[yes, is, datatype, boolean].
+[no, is, datatype, boolean].
+[_, is, datatype, boolean] if no.
+```
+
+Doing the above for, for example, numbers requires the ability to process symbols/literals as strings. And parsing should probably already be finished by that time anyway.
+
+But if not, then units of measure wouldn't require compiler support. You write parse/print rules that work not only on input files but also on the source itself.
+
+And does the type of a literal matter if it's not passed to something with a type restriction?
+
 ### assert and retract used to cache
 
 Making and breaking relationships is done at runtime with `[cache, relationship, where]` and `[uncache, relationship]`, treating the whole program source as a self-modifying program. `where` is either the beginning of the code or the end.

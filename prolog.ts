@@ -69,10 +69,12 @@ function printEcholine(str: string) {
   div.innerHTML = "<span>" + str + "</span>";
 }
 
-function printDebugline(str: string) {
+function printDebugline(...rest: any[]) {
   const div = newConsoleLine();
   div.classList.add("debugdiv");
-  div.innerHTML = "<div>" + str.replaceAll("\n", "</div><div>") + "</div>";
+  div.innerHTML = "<div>" + rest.join(" ").replaceAll("\n", "</div><div>") + "</div>";
+  newConsoleLine();
+  return null;
 }
 
 function printAnswerline(str: string) {
@@ -167,27 +169,28 @@ class Environment {
     printAnswerline(retval.length ? retval.join("") : "Empty.\n");
   }
 
-  // Return a list of all variables mentioned in a list of Tuples.
-  static varNames(parts: TupleItem[]): Variable[] {
-    const variables: Variable[] = [];
-    for (const part of parts) {
-      switch (part.type) {
-        case "Literal":
-          continue;
-        case "Variable":
-          if (!variables.find(o => o.name == part.name)) variables.push(part);
-          continue;
-        case "Tuple":
-          const nestedVariables = Environment.varNames(part.items);
-          for (const nestedVariable of nestedVariables) if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
-          continue;
-      }
-    }
-    return variables;
-  }
-
+  // prints what values vars are bound to
   printBindings(tuples: Tuple[]): void {
-    const variables = Environment.varNames(tuples);
+    // Return a list of all variables mentioned in a list of Tuples.
+    const varNames = (parts: TupleItem[]): Variable[] => {
+      const variables: Variable[] = [];
+      for (const part of parts) {
+        switch (part.type) {
+          case "Literal":
+            continue;
+          case "Variable":
+            if (!variables.find(o => o.name == part.name)) variables.push(part);
+            continue;
+          case "Tuple":
+            const nestedVariables = varNames(part.items);
+            for (const nestedVariable of nestedVariables) if (!variables.find(o => o.name == nestedVariable.name)) variables.push(nestedVariable);
+            continue;
+        }
+      }
+      return variables;
+    };
+
+    const variables = varNames(tuples);
     if (variables.length == 0) return printAnswerline("Yes.\n\n");
 
     const retval: string[] = [];
@@ -238,15 +241,25 @@ class Environment {
     if (x.type == "Literal" || y.type == "Literal") return x.type == y.type && x.name == y.name ? this : null;
 
     // x.type == y.type == Tuple...
-    if (x.name != y.name) return null; // Ooh, so first-order.
     const xs = x.items;
     const ys = y.items;
     if (xs.length != ys.length) return null;
 
     let env: Environment | null = this;
+    // check pairs of literals first, for performance
     for (let i = 0; i < xs.length; i++) {
-      env = env.unify(xs[i], ys[i]);
-      if (env == null) return null;
+      if (xs[i].type == "Literal" || ys[i].type == "Literal") {
+        env = env.unify(xs[i], ys[i]);
+        if (env == null) return null;
+      }
+    }
+    //console.log("trying", y.name);
+    // now check everything else
+    for (let i = 0; i < xs.length; i++) {
+      if (xs[i].type != "Literal" && ys[i].type != "Literal") {
+        env = env.unify(xs[i], ys[i]);
+        if (env == null) return null;
+      }
     }
 
     return env;
@@ -293,7 +306,6 @@ function answerQuestion(goals: Tuple[], env: Environment, db: Database, level: n
   for (const rule of db) {
     if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.
     if (rule == first.dontSelfRecurse) continue; // prevent immediate self-recursion
-    if (rule.head.name != first.name) continue; // we'll need better unification to allow the 2nd-order rule matching
     const renamedHead = new Tuple(renameVariables(rule.head.items, level, first), undefined, rule.head.dontSelfRecurse); // Rename head's variables
     const nextEnvironment = env.unify(first, renamedHead); // try to unify the first of goals[] with this rule's head
     if (nextEnvironment == null) continue; // no unify? try next rule in the db
@@ -357,10 +369,11 @@ class Tuple {
   commit?: boolean;
 
   constructor(list: TupleItem[], parent?: Tuple, dontSelfRecurse?: Rule) {
-    this.name = list[0]?.name || "anonymous";
+    this.name = list.length == 0 ? "anonymous" : list.find(item => item.type == "Literal")?.name || "anonymous";
     this.items = list;
     this.parent = parent || this;
     this.dontSelfRecurse = dontSelfRecurse;
+    //console.log("tuple name", this.name);
   }
 
   // extra-logical markup goes here, outside of and just before a Tuple starts.
@@ -752,7 +765,7 @@ function More(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, 
 // [ask, X].  Given a single argument, it sticks it on the goal list.
 function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first: TupleItem = env.value(thisTuple.items[1]);
-  if (first.type != "Tuple") return consoleOutError(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type) || true;
+  if (first.type != "Tuple") return printDebugline(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type);
   first.parent = thisTuple;
   const newGoals = [first].concat(goals);
   return answerQuestion(newGoals, env, db, level + 1, onReport);
@@ -761,12 +774,12 @@ function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, l
 // [compare, First: string|number, Second: string|number, CmpValue: gt|eq|lt]
 function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first = environment.value(thisTuple.items[1]);
-  if (first.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type) || true;
+  if (first.type != "Literal") return printDebugline(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type);
   const second = environment.value(thisTuple.items[2]);
-  if (second.type != "Literal") return consoleOutError(null, "[Comparitor] only accepts literals.", second.name, "is a ", second.type) || true;
+  if (second.type != "Literal") return printDebugline(null, "[Comparitor] only accepts literals.", second.name, "is a ", second.type);
   const cmp = first.name < second.name ? "lt" : first.name > second.name ? "gt" : "eq";
   const env2 = environment.unify(thisTuple.items[3], new Literal(cmp));
-  if (env2 == null) return consoleOutError(null, "[Comparitor] cannot unify final noun with", cmp) || true;
+  if (env2 == null) return printDebugline("[Comparitor] cannot unify final noun with", cmp);
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
@@ -790,7 +803,7 @@ function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database,
   for (let i = answers.length; i > 0; i--) cons = new Tuple([new Literal(ops.cons), answers[i - 1], cons]);
 
   const env2 = env.unify(into, cons);
-  if (env2 == null) return consoleOutError(null, "[bagof] cannot unify final noun with", into.print()) || true;
+  if (env2 == null) return printDebugline(null, "[bagof] cannot unify final noun with", into.print());
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
@@ -810,8 +823,7 @@ function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database,
   // Get the first tuple, the template.
   const template = env.value(term.items[1]);
   const regresult = template.name.match(/^"(.*)"$/);
-  if (template.type != "Literal" || !regresult)
-    return consoleOutError(null, 'First noun of [External] must be a string in "double quotes" not', template.name) || true;
+  if (template.type != "Literal" || !regresult) return printDebugline(null, 'First noun of [External] must be a string in "double quotes" not', template.name);
 
   let jsCommand = regresult[1];
 
@@ -820,14 +832,14 @@ function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database,
   let i = 1;
   while (currentLinkedListNode.name == ops.cons && currentLinkedListNode.type == "Tuple") {
     const arg = env.value(currentLinkedListNode.items[1]);
-    if (arg.type != "Literal") return consoleOutError(null, "Second noun of [External] must contain all literals. #" + i, "is a", arg.print()) || true;
+    if (arg.type != "Literal") return printDebugline(null, "Second noun of [External] must contain all literals. #" + i, "is a", arg.print());
     const re = new RegExp("\\$" + i, "g"); // replace $1, $2, etc with values of passed-in params
     jsCommand = jsCommand.replace(re, arg.name);
     currentLinkedListNode = currentLinkedListNode.items[2];
     i++;
   }
   if (currentLinkedListNode.type != "Literal" || currentLinkedListNode.name != ops.nothing)
-    return consoleOutError(null, "Second noun of [External] must be a {...} list, not", currentLinkedListNode.print());
+    return printDebugline(null, "Second noun of [External] must be a {...} list, not", currentLinkedListNode.print());
 
   let jsReturnValue: string;
   // @ts-ignore
@@ -837,7 +849,7 @@ function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database,
   // Convert back into an literal or tupleitem...
   const part = Tuple.parseItem(new Tokeniser((jsReturnValue ?? "").toString()));
   const env2 = env.unify(term.items[3], part!);
-  if (env2 == null) return consoleOutError(null, "[External] cannot unify return value with", jsReturnValue);
+  if (env2 == null) return printDebugline(null, "[External] cannot unify return value with", jsReturnValue);
   return answerQuestion(goals, env2, db, level + 1, onReport);
 }
 
