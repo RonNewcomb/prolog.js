@@ -25,7 +25,7 @@ input[type="text"] {
 
 .errdiv {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 .errdiv > * {
@@ -39,7 +39,7 @@ input[type="text"] {
 
 .answerdiv {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 .answerdiv > * {
@@ -66,6 +66,11 @@ input[type="text"] {
 }
 
 .echodiv {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.echodiv > * {
   text-align: left;
   margin: 8px;
   border: 1px dashed lightgray;
@@ -75,6 +80,11 @@ input[type="text"] {
 }
 
 .userdiv {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.userdiv > * {
   text-align: left;
   margin: 8px;
   background-color: darkslateblue;

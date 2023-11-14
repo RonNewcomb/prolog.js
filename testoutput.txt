@@ -1,8 +1,6 @@
-This prolog is enhanced with the JavaScript callout capability though a rudimentary external/3 call; see the arithmetic functions for examples.
-
  Show parse results
 Initializing engine.
-Parsing rulesets.
+Fetching testinput.txt
 # testing basics
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .

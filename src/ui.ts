@@ -22,19 +22,19 @@ export function newConsoleLine(): HTMLDivElement {
 let showEcholines = (document as Document).input.showparse.checked;
 export function toggleEcholines() {
   showEcholines = !showEcholines;
-  document.querySelectorAll<HTMLDivElement>("div.echodiv").forEach(el => (el.style.display = showEcholines ? "block" : "none"));
+  document.querySelectorAll<HTMLDivElement>("div.echodiv").forEach(el => (el.style.display = showEcholines ? "flex" : "none"));
 }
 
 export function printUserline(str: string) {
   const div = newConsoleLine();
   div.classList.add("userdiv");
-  div.innerHTML = "<span>" + str + "</span>";
+  div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
 }
 
 export function printEcholine(str: string) {
   const div = newConsoleLine();
   div.classList.add("echodiv");
-  div.innerHTML = "<span>" + str + "</span>";
+  div.innerHTML = "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>";
 }
 
 export function printDebugline(...rest: any[]) {
