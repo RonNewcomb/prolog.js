@@ -87,4 +87,4 @@ function nextline(line: string) {
   commandLineEl.focus();
 }
 
-importSource("testinput.txt").then(_ => commandLineEl.scrollIntoView());
+importSource("test/testinput.txt").then(_ => commandLineEl.scrollIntoView());

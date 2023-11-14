@@ -15,6 +15,7 @@ class FunctorIterator {
   current: TupleItem | typeof NOMORE = NOMORE;
   i = 0;
   isDone = false;
+  subIter: FunctorIterator | undefined;
 
   constructor(private areTheseTrue: Tuple[], private scope: Environment, private db: Database) {
     this.first();
@@ -44,9 +45,9 @@ class FunctorIterator {
 
       const nextGoals = rule.body ? rule.body.concat(rest) : rest;
 
-      const subIter = new FunctorIterator(nextGoals, nextEnvironment, this.db);
-      if (subIter.isDone) continue;
-      return subIter.current;
+      if (!this.subIter) this.subIter = new FunctorIterator(nextGoals, nextEnvironment, this.db);
+      if (this.subIter.isDone) continue;
+      return this.subIter.current;
     }
 
     this.isDone = true;
