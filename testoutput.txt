@@ -1,7 +1,7 @@
  Show parse results
-Initializing engine.
 Fetching testinput.txt
 # testing basics
+👍
 [holds, "bucket", 834, yes].
 [holds, "bucket", 834, yes] .
 Memorized.
@@ -15,6 +15,7 @@ No.
 [holds, "bucket", the capacity, yes] ?
 The capacity is 834.
 #[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
+👍
 [holds, "bucket", ?, yes]
 [holds, "bucket", the ?, yes] ?
 834.
@@ -36,6 +37,7 @@ The container is "envelope".
 The capacity is 1.
 The whether is yes.
 # testing NOT
+👍
 [holds, "bucket", 834, yes]?
 [holds, "bucket", 834, yes] ?
 Yes.
@@ -49,6 +51,7 @@ No.
 [not, [holds, "bucket", 76, yes]] ?
 No.
 # testing First item not special
+👍
 [Bob, dreams, big]
 [Bob, dreams, big] .
 Memorized.
@@ -62,11 +65,14 @@ dreams.
 [Bob, dreams, the ?] ?
 big.
 ### Accumulated standard library lives under here!
+👍
 # unification and [ x, y, z; w ] support
+👍
 [unify, an xxx, an xxx].
 [unify, the xxx, the xxx] .
 Memorized.
 # [ a, b, c ] --> [and, {a, b, c}]
+👍
 [and, {}].
 [and, nothing] .
 Memorized.
@@ -74,6 +80,7 @@ Memorized.
 [and, {the question | the rest}] if [ask, the question], [and, the rest] .
 Memorized.
 # [ a; b; c ] --> [or, {a, b, c}]
+👍
 [or, {a question | the alternatives}] if [ask, the question].
 [or, {the question | the alternatives}] if [ask, the question] .
 Memorized.
@@ -81,6 +88,7 @@ Memorized.
 [or, {the question | the alternatives}] if [or, the alternatives] .
 Memorized.
 # arithmetic
+👍
 [add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
 [add, the aaa, the bbb, the sum] if [javascript, "$1 + $2", {the aaa, the bbb}, the sum] .
 Memorized.
@@ -94,6 +102,7 @@ Memorized.
 [div, the aaa, the bbb, the quotient] if [javascript, "$1 / $2", {the aaa, the bbb}, the quotient] .
 Memorized.
 # The canonical quicksort
+👍
 [qsort, {}, {}].
 [qsort, nothing, nothing] .
 Memorized.
@@ -119,6 +128,7 @@ Memorized.
 [gtr, the xxx, the yyy] if [compare, the xxx, the yyy, lt] .
 Memorized.
 # Some list-processing stuff...
+👍
 [append, {}, a zzzz, a zzzz].
 [append, nothing, the zzzz, the zzzz] .
 Memorized.
@@ -138,6 +148,7 @@ Memorized.
 [length, {the hhhh | the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn] .
 Memorized.
 # Standard prolog not/1
+👍
 [not, the tttterm] if [ask, the tttterm], commit, get_more.
 [not, the tttterm] if [ask, the tttterm], [commit], [get_more] .
 Memorized.
@@ -145,6 +156,7 @@ Memorized.
 [not, the tttterm] .
 Memorized.
 # Standard prolog var/1 = unbound/1
+👍
 [unbound, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
 [unbound, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
 Memorized.
@@ -155,12 +167,16 @@ Memorized.
 [tarTest, b] .
 Memorized.
 # standard once/1
+👍
 [once, a goal] if [ask, the goal], commit.
 [once, the goal] if [ask, the goal], [commit] .
 Memorized.
 #
+👍
 #
+👍
 # Enter your ruleset in here.
+👍
 [triple, sc, a, b].
 [triple, sc, a, b] .
 Memorized.

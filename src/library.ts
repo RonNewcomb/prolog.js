@@ -1,9 +1,3 @@
-// A sample builtin function, including all the bits you need to get it to work within the general proving mechanism.
-// General plan:
-// Prove the builtin bit, then break out and prove the remaining goals.
-// If we were intending to have a resumable builtin (one that can return multiple bindings) then we'd wrap all of this in a while() loop.
-// var renamedHead = new Tuple(renameVariables(rule.head.items.list, level)); // Rename the variables in the head and body
-
 import { answerQuestion, renameVariable, renameVariables } from "./engine";
 import type { Environment } from "./environment";
 import { Database, ReportFunction, FunctorResult, ops } from "./interfaces";
@@ -21,7 +15,7 @@ export const builtin = {
   ["import/1"]: ImportSource,
 };
 
-export function ImportSource(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function ImportSource(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first: TupleItem = environment.value(thisTuple.items[1]);
   if (first.type == "Tuple") return printDebugline(null, "[import] doesn't accept a Tuple.");
   const filename = first.type == "Literal" ? first.name.replaceAll('"', "") : first.name;
@@ -29,18 +23,18 @@ export function ImportSource(thisTuple: Tuple, goals: Tuple[], environment: Envi
   return null;
 }
 
-export function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const ret = answerQuestion(goals, environment, db, level + 1, onReport); // On the way through, we do nothing... Just prove the rest of the goals, recursively.
   thisTuple.parent.commit = true; // Backtracking through the 'commit' stops any further attempts to prove this subgoal.
   return ret;
 }
 
-export function More(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function More(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   return null; // TODO shouldn't this return True or something?
 }
 
 // [ask, X].  Given a single argument, it sticks it on the goal list.
-export function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first: TupleItem = env.value(thisTuple.items[1]);
   if (first.type != "Tuple") return printDebugline(null, "[Call] only accepts a Tuple.", first.name, "is a", first.type);
   first.parent = thisTuple;
@@ -49,7 +43,7 @@ export function Ask(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Data
 }
 
 // [compare, First: string|number, Second: string|number, CmpValue: gt|eq|lt]
-export function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const first = environment.value(thisTuple.items[1]);
   if (first.type != "Literal") return printDebugline(null, "[Comparitor] only accepts literals.", first.name, "is a ", first.type);
   const second = environment.value(thisTuple.items[2]);
@@ -63,7 +57,7 @@ export function Comparitor(thisTuple: Tuple, goals: Tuple[], environment: Enviro
 type AnswerList = TupleItem[] & { renumber?: number };
 
 // [bagof, Tuple, ConditionTuple, ReturnList]
-export function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function BagOf(thisTuple: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   let collect = env.value(thisTuple.items[1]);
   const subgoal = env.value(thisTuple.items[2]) as Tuple;
   const into = env.value(thisTuple.items[3]);
@@ -96,7 +90,7 @@ function BagOfCollectFunction(collecting: TupleItem, anslist: AnswerList): Repor
 // arg1: a template string that uses $1, $2, etc. as placeholders
 // arg2: a list of values  // a cons linked-list
 // arg3: return value from javascript, if any
-export function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
+function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   // Get the first tuple, the template.
   const template = env.value(term.items[1]);
   const regresult = template.name.match(/^"(.*)"$/);

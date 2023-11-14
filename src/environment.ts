@@ -83,7 +83,8 @@ export class Environment {
   }
 
   // Unify two items under the current environment. Returns a new environment, or null on failure
-  unify(x: TupleItem, y: TupleItem): Environment | null {
+  unify(x: TupleItem | null, y: TupleItem | null): Environment | null {
+    if (x == null || y == null) return null;
     x = this.value(x);
     y = this.value(y);
     if (x.type == "Variable") return this.spawn(x.name, y);
