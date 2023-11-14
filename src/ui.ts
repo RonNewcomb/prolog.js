@@ -62,7 +62,7 @@ commandLineEl.addEventListener("keydown", (event: any) => {
   }
 });
 
-async function importSource(filename: string) {
+export async function importSource(filename: string) {
   printAnswerline("Fetching " + filename);
   const text = await fetch(filename).then(response => response.text());
   text.split("\n").forEach(nextline);
@@ -78,4 +78,4 @@ function nextline(line: string) {
   commandLineEl.focus();
 }
 
-importSource("testinput.txt");
+importSource("testinput.txt").then(_ => commandLineEl.scrollIntoView());
