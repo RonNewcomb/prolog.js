@@ -192,3 +192,16 @@ Memorized.
 Memorized.
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]? # L should have 21 elements
 [bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
+The aaa is anything.
+The bbb is anything.
+The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
+The nnn is 21.
+[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
+[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
+The aaa is anything.
+The bbb is anything.
+The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
+The nnn is 21.
+[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
+expected complex question to end with ? but instead got
+.
