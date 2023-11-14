@@ -3,6 +3,66 @@ This prolog is enhanced with the JavaScript callout capability though a rudiment
  Show parse results
 Initializing engine.
 Parsing rulesets.
+# testing basics
+[holds, "bucket", 834, yes].
+[holds, "bucket", 834, yes] .
+Memorized.
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[holds, "bucket", the capacity, yes]?
+[holds, "bucket", the capacity, yes] ?
+The capacity is 834.
+#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
+[holds, "bucket", ?, yes]
+[holds, "bucket", the ?, yes] ?
+834.
+[holds, "box", 411, no].
+[holds, "box", 411, no] .
+Memorized.
+[holds, "envelope", 1, yes].
+[holds, "envelope", 1, yes] .
+Memorized.
+[holds, a container, a capacity, any whether]?
+[holds, the container, the capacity, the whether] ?
+The container is "bucket".
+The capacity is 834.
+The whether is yes.
+The container is "box".
+The capacity is 411.
+The whether is no.
+The container is "envelope".
+The capacity is 1.
+The whether is yes.
+# testing NOT
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[not, [holds, "bucket", 834, yes]]?
+[not, [holds, "bucket", 834, yes]] ?
+No.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[not, [holds, "bucket", 76, yes]]?
+[not, [holds, "bucket", 76, yes]] ?
+No.
+# testing First item not special
+[Bob, dreams, big]
+[Bob, dreams, big] .
+Memorized.
+[?, dreams, big]
+[the ?, dreams, big] ?
+Bob.
+[Bob, ? , big]
+[Bob, the ?, big] ?
+dreams.
+[Bob, dreams, ?]
+[Bob, dreams, the ?] ?
+big.
 ### Accumulated standard library lives under here!
 # unification and [ x, y, z; w ] support
 [unify, an xxx, an xxx].
@@ -132,63 +192,3 @@ Memorized.
 Memorized.
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]? # L should have 21 elements
 [bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
-# testing basics
-[holds, "bucket", 834, yes].
-[holds, "bucket", 834, yes] .
-Memorized.
-[holds, "bucket", 834, yes]?
-[holds, "bucket", 834, yes] ?
-Yes.
-[holds, "bucket", 76, yes]?
-[holds, "bucket", 76, yes] ?
-No.
-[holds, "bucket", the capacity, yes]?
-[holds, "bucket", the capacity, yes] ?
-The capacity is 834.
-#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
-[holds, "bucket", ?, yes]
-[holds, "bucket", the ?, yes] ?
-834.
-[holds, "box", 411, no].
-[holds, "box", 411, no] .
-Memorized.
-[holds, "envelope", 1, yes].
-[holds, "envelope", 1, yes] .
-Memorized.
-[holds, a container, a capacity, any whether]?
-[holds, the container, the capacity, the whether] ?
-The container is "bucket".
-The capacity is 834.
-The whether is yes.
-The container is "box".
-The capacity is 411.
-The whether is no.
-The container is "envelope".
-The capacity is 1.
-The whether is yes.
-# testing NOT
-[holds, "bucket", 834, yes]?
-[holds, "bucket", 834, yes] ?
-Yes.
-[not, [holds, "bucket", 834, yes]]?
-[not, [holds, "bucket", 834, yes]] ?
-No.
-[holds, "bucket", 76, yes]?
-[holds, "bucket", 76, yes] ?
-No.
-[not, [holds, "bucket", 76, yes]]?
-[not, [holds, "bucket", 76, yes]] ?
-No.
-# testing First item not special
-[Bob, dreams, big]
-[Bob, dreams, big] .
-Memorized.
-[?, dreams, big]
-[the ?, dreams, big] ?
-Bob.
-[Bob, ? , big]
-[Bob, the ?, big] ?
-dreams.
-[Bob, dreams, ?]
-[Bob, dreams, the ?] ?
-big.
