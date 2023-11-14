@@ -3,7 +3,6 @@ import type { Tokeniser } from "./tokenizer";
 
 interface Document extends globalThis.Document {
   input: HTMLFormElement;
-  // rules: HTMLFormElement;
 }
 
 // web browser IDE things /////
@@ -23,6 +22,7 @@ let showEcholines = (document as Document).input.showparse.checked;
 export function toggleEcholines() {
   showEcholines = !showEcholines;
   document.querySelectorAll<HTMLDivElement>("div.echodiv").forEach(el => (el.style.display = showEcholines ? "flex" : "none"));
+  commandLineEl.focus();
 }
 
 export function printUserline(str: string) {
@@ -80,18 +80,18 @@ async function init() {
   engine_init();
 
   printAnswerline("Fetching testinput.txt\n");
-  // (document as Document).rules.rules.value.split("\n").forEach(nextline);
-  return fetch("testinput.txt")
-    .then(r => r.text())
-    .then(text => text.replaceAll("\r", "").split("\n").forEach(nextline));
+  const text = await fetch("testinput.txt").then(response => response.text());
+  text.split("\n").forEach(nextline);
 }
 
 function nextline(line: string) {
-  if (!line || line.match(/^\s+$/)) return;
+  line = (line || "").trim();
+  if (!line) return;
   printUserline(line);
   previousInput = line;
   if (line.match(/^\s*#/)) return; //== ops.comment
-  return processLine(line);
+  const db = processLine(line);
+  commandLineEl.focus();
 }
 
 // run program
