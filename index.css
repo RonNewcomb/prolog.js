@@ -82,3 +82,8 @@ input[type="text"] {
   border-radius: 8px;
   width: fit-content;
 }
+
+#commandline {
+  background-color: white;
+  color: black;
+}

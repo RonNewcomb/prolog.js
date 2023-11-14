@@ -7,6 +7,8 @@ import { Tuple, type TupleItem, Variable } from "./tupleItem";
 import { consoleOutError, printAnswerline, printEcholine } from "./ui";
 
 export const database: Database = [] as Database;
+(window as any).db = () => database.forEach(rule => console.log(rule.print()));
+console.info("enter db() to show the database");
 
 export function engine_init(): void {
   database.builtin = {};

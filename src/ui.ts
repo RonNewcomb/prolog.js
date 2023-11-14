@@ -3,7 +3,7 @@ import type { Tokeniser } from "./tokenizer";
 
 interface Document extends globalThis.Document {
   input: HTMLFormElement;
-  rules: HTMLFormElement;
+  // rules: HTMLFormElement;
 }
 
 // web browser IDE things /////
@@ -74,13 +74,16 @@ export function onCommandlineKey(event: any, el: HTMLInputElement) {
   }
 }
 
-// called from HTML on startup
-function init() {
+// called on startup
+async function init() {
   printAnswerline("\nInitializing engine.\n");
   engine_init();
 
-  printAnswerline("Parsing rulesets.\n");
-  (document as Document).rules.rules.value.split("\n").forEach(nextline);
+  printAnswerline("Fetching testinput.txt\n");
+  // (document as Document).rules.rules.value.split("\n").forEach(nextline);
+  return fetch("testinput.txt")
+    .then(r => r.text())
+    .then(text => text.replaceAll("\r", "").split("\n").forEach(nextline));
 }
 
 function nextline(line: string) {
