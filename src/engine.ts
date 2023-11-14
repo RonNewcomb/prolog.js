@@ -1,9 +1,42 @@
 import { Environment } from "./environment";
-import type { Database, ReportFunction, FunctorResult } from "./interfaces";
-import { Tuple, TupleItem, Variable } from "./tupleItem";
-import { consoleOutError } from "./ui";
+import { type Database, type ReportFunction, type FunctorResult, ops } from "./interfaces";
+import { Comparitor, Commit, Ask, More, BagOf, ExternalJS } from "./library";
+import { Rule } from "./rule";
+import { Tokeniser } from "./tokenizer";
+import { Tuple, type TupleItem, Variable } from "./tupleItem";
+import { consoleOutError, printAnswerline, printEcholine } from "./ui";
 
 export const database: Database = [] as Database;
+
+export function engine_init(): void {
+  database.builtin = {};
+  database.builtin["compare/3"] = Comparitor;
+  database.builtin[ops.cutCommit + "/0"] = Commit;
+  database.builtin["ask/1"] = Ask;
+  database.builtin[ops.failRollbackMoreAgain + "/0"] = More;
+  database.builtin["bagof/3"] = BagOf;
+  database.builtin["javascript/3"] = ExternalJS;
+}
+
+export function processLine(line: string): Database {
+  const rule = Rule.parse(new Tokeniser(line));
+  if (rule == null) return database;
+  printEcholine(rule.print());
+  if (rule.asking) {
+    let reported = false;
+    const reportFn = (env: Environment) => {
+      reported = true;
+      env.printBindings(rule.body!);
+    };
+    //console.log("Asking", line);
+    answerQuestion(renameVariables(rule.body!, 0) as Tuple[], new Environment(), database, 1, reportFn);
+    if (!reported) printAnswerline("No.\n");
+  } else {
+    database.push(rule);
+    printAnswerline("Memorized.\n");
+  }
+  return database;
+}
 
 // Go through a tuple's terms renaming variables by appending 'level' to each variable name.
 // "parent" points to the subgoal, the expansion of which led to these tuples.

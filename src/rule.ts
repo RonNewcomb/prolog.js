@@ -1,6 +1,6 @@
 import { ops } from "./interfaces";
-import { Tokeniser } from "./tokenizer";
-import { Tuple, TupleItem } from "./tupleItem";
+import type { Tokeniser } from "./tokenizer";
+import { Tuple, type TupleItem } from "./tupleItem";
 import { consoleOutError } from "./ui";
 
 export class Rule {

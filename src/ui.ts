@@ -1,10 +1,5 @@
-import { database, answerQuestion, renameVariables } from "./engine";
-import { Environment } from "./environment";
-import { ops, Database } from "./interfaces";
-import { Comparitor, Commit, Ask, More, BagOf, ExternalJS } from "./library";
-import { Rule } from "./rule";
-import { Tokeniser } from "./tokenizer";
-import { Tuple } from "./tupleItem";
+import { engine_init, processLine } from "./engine";
+import type { Tokeniser } from "./tokenizer";
 
 interface Document extends globalThis.Document {
   input: HTMLFormElement;
@@ -81,42 +76,19 @@ export function onCommandlineKey(event: any, el: HTMLInputElement) {
 
 // called from HTML on startup
 function init() {
-  printAnswerline("\nAttaching builtins to database.\n");
-  database.builtin = {};
-  database.builtin["compare/3"] = Comparitor;
-  database.builtin[ops.cutCommit + "/0"] = Commit;
-  database.builtin["ask/1"] = Ask;
-  database.builtin[ops.failRollbackMoreAgain + "/0"] = More;
-  database.builtin["bagof/3"] = BagOf;
-  database.builtin["javascript/3"] = ExternalJS;
-  printAnswerline("Attachments done.\n");
+  printAnswerline("\nInitializing engine.\n");
+  engine_init();
 
   printAnswerline("Parsing rulesets.\n");
   (document as Document).rules.rules.value.split("\n").forEach(nextline);
 }
 
-function nextline(line: string): Database {
-  if (!line || line.match(/^\s+$/)) return database;
+function nextline(line: string) {
+  if (!line || line.match(/^\s+$/)) return;
   printUserline(line);
   previousInput = line;
-  if (line.match(/^\s*#/)) return database; //== ops.comment
-  const rule = Rule.parse(new Tokeniser(line));
-  if (rule == null) return database;
-  printEcholine(rule.print());
-  if (rule.asking) {
-    let reported = false;
-    const reportFn = (env: Environment) => {
-      reported = true;
-      env.printBindings(rule.body!);
-    };
-    //console.log("Asking", line);
-    answerQuestion(renameVariables(rule.body!, 0) as Tuple[], new Environment(), database, 1, reportFn);
-    if (!reported) printAnswerline("No.\n");
-  } else {
-    database.push(rule);
-    printAnswerline("Memorized.\n");
-  }
-  return database;
+  if (line.match(/^\s*#/)) return; //== ops.comment
+  return processLine(line);
 }
 
 // run program

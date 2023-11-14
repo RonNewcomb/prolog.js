@@ -5,10 +5,10 @@
 // var renamedHead = new Tuple(renameVariables(rule.head.items.list, level)); // Rename the variables in the head and body
 
 import { answerQuestion, renameVariable, renameVariables } from "./engine";
-import { Environment } from "./environment";
+import type { Environment } from "./environment";
 import { Database, ReportFunction, FunctorResult, ops } from "./interfaces";
 import { Tokeniser } from "./tokenizer";
-import { Tuple, TupleItem, Literal } from "./tupleItem";
+import { Tuple, type TupleItem, Literal } from "./tupleItem";
 import { printDebugline } from "./ui";
 
 export function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {

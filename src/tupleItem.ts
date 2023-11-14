@@ -6,8 +6,8 @@
 // TupleItem = Variable | Literal | Tuple
 
 import { ops } from "./interfaces";
-import { Rule } from "./rule";
-import { Tokeniser } from "./tokenizer";
+import type { Rule } from "./rule";
+import type { Tokeniser } from "./tokenizer";
 import { consoleOutError } from "./ui";
 
 export type TupleItem = Variable | Literal | Tuple;

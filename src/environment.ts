@@ -1,5 +1,5 @@
 import { ops } from "./interfaces";
-import { TupleItem, Tuple, Variable } from "./tupleItem";
+import { type TupleItem, Tuple, Variable } from "./tupleItem";
 import { printAnswerline } from "./ui";
 
 export class Environment {
