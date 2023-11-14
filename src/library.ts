@@ -9,7 +9,7 @@ import type { Environment } from "./environment";
 import { Database, ReportFunction, FunctorResult, ops } from "./interfaces";
 import { Tokeniser } from "./tokenizer";
 import { Tuple, type TupleItem, Literal } from "./tupleItem";
-import { printDebugline } from "./ui";
+import { consoleOutError, printDebugline } from "./ui";
 
 export function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const ret = answerQuestion(goals, environment, db, level + 1, onReport); // On the way through, we do nothing... Just prove the rest of the goals, recursively.
@@ -100,9 +100,14 @@ export function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Da
   if (currentLinkedListNode.type != "Literal" || currentLinkedListNode.name != ops.nothing)
     return printDebugline(null, "Second noun of [External] must be a {...} list, not", currentLinkedListNode.print());
 
-  let jsReturnValue: string = Function(jsCommand)();
-  //with ([]) jsReturnValue = eval(jsCommand);
-  if (!jsReturnValue) jsReturnValue = ops.nothing;
+  let jsReturnValue = ops.nothing;
+  try {
+    jsReturnValue = Function("return " + jsCommand)();
+    //with ([]) jsReturnValue = eval(jsCommand);
+    if (!jsReturnValue) jsReturnValue = ops.nothing;
+  } catch (e) {
+    consoleOutError(null, e);
+  }
 
   // Convert back into an literal or tupleitem...
   const part = Tuple.parseItem(new Tokeniser((jsReturnValue ?? "").toString()));
