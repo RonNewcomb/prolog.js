@@ -6,9 +6,10 @@ import { Tokeniser } from "./tokenizer";
 import { Tuple, type TupleItem, Variable } from "./tupleItem";
 import { consoleOutError, printAnswerline, printEcholine } from "./ui";
 
-export const database: Database = [] as Database;
-(window as any).db = () => database.forEach(rule => console.log(rule.print()));
+export const database: Database = [];
+
 console.info("enter db() to show the database");
+(window as any).db = () => database.forEach(rule => console.log(rule.print()));
 
 export function processLine(line: string): Database {
   const rule = Rule.parse(new Tokeniser(line));
@@ -32,7 +33,8 @@ export function processLine(line: string): Database {
 
 // Go through a tuple's terms renaming variables by appending 'level' to each variable name.
 // "parent" points to the subgoal, the expansion of which led to these tuples.
-export const renameVariables = (items: TupleItem[], level: number, parent?: Tuple): TupleItem[] => items.map(item => renameVariable(item, level, parent));
+export const renameVariables = (items: TupleItem[] | null | undefined, level: number, parent?: Tuple): TupleItem[] =>
+  !items ? [] : items.map(item => renameVariable(item, level, parent));
 
 export function renameVariable(rvalue: TupleItem, level: number, parent?: Tuple): TupleItem {
   switch (rvalue.type) {

@@ -5,13 +5,14 @@ const toggleStyleEl = document.createElement("style")! as HTMLStyleElement;
 toggleStyleEl.id = "toggleStyleEl";
 document.head.appendChild(toggleStyleEl);
 
-const showparseCheckEl = document.getElementById("showparse")! as HTMLInputElement;
-showparseCheckEl.addEventListener("click", (event: any) => {
-  toggleStyleEl.innerText = event.target.checked ? ".echodiv { }" : ".echodiv { display: none !important; }";
+document.getElementById("showparse")!.addEventListener("click", event => {
+  const checkbox = event.target as HTMLInputElement;
+  toggleStyleEl.innerText = checkbox.checked ? ".echodiv { }" : ".echodiv { display: none !important; }";
   commandLineEl.focus();
 });
 
 const consoleOutEl = document.getElementById("consoleout")! as HTMLDivElement;
+
 export function newConsoleLine(classes?: string, html?: string): HTMLDivElement {
   const elemDiv = document.createElement("div");
   if (classes) elemDiv.classList.add(classes);
@@ -45,19 +46,25 @@ export function consoleOutError(tk: Tokeniser | null, ...rest: any[]): null {
   return null;
 }
 
-let previousInput = "";
+const previousInput: string[] = [];
+let previousInputIndex = 0;
 
 const commandLineEl = document.getElementById("commandline")! as HTMLInputElement;
-commandLineEl.addEventListener("keydown", (event: any) => {
-  const el = event.target;
+commandLineEl.addEventListener("keydown", event => {
+  const input = event.target as HTMLInputElement;
   switch (event.key) {
     case "ArrowUp":
-      el.value = previousInput;
+      if (previousInputIndex < previousInput.length - 1) previousInputIndex++;
+      input.value = previousInput[previousInput.length - 1 - previousInputIndex];
+      return;
+    case "ArrowDown":
+      if (previousInputIndex >= 0) previousInputIndex--;
+      input.value = previousInputIndex >= 0 ? previousInput[previousInput.length - 1 - previousInputIndex] : "";
       return;
     case "Enter":
-      nextline(event.target.value);
-      el.value = "";
-      el.scrollIntoView();
+      nextline(input.value);
+      input.value = "";
+      input.scrollIntoView();
       return;
   }
 });
@@ -68,12 +75,14 @@ export async function importSource(filename: string) {
   text.split("\n").forEach(nextline);
 }
 
+const emojiThumbsUp = "&#x1F44D;";
+
 function nextline(line: string) {
   line = (line || "").trim();
   if (!line) return;
   printUserline(line);
-  previousInput = line;
-  if (line.match(/^\s*#/)) return; //== ops.comment
+  previousInput.push(line);
+  if (line.match(/^\s*#/)) return printAnswerline(emojiThumbsUp); //== ops.comment
   const db = processLine(line);
   commandLineEl.focus();
 }
