@@ -2,6 +2,8 @@
 
 _Prolog in sweatpants_
 
+`tsc && rollup -c`
+
 There's a maxim in software development: once you know one language, you know them all. It's not hard to see why. Variables, loops, "if" statements, we see the same constructs in different clothes everywhere. But there's one language that really is quite different from the others, and that's Prolog.
 
 Created in the early 1970s, Prolog's concept is that of executable logic proofs. Much of the terminology surrounding Prolog follows suit. Perhaps in the 70s everyone who worked with computers knew all about Horn clauses and the like so this seemed natural. Or at least there was much less consensus on how coding languages should be.

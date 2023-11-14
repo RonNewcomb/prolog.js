@@ -100,9 +100,8 @@ export function ExternalJS(term: Tuple, goals: Tuple[], env: Environment, db: Da
   if (currentLinkedListNode.type != "Literal" || currentLinkedListNode.name != ops.nothing)
     return printDebugline(null, "Second noun of [External] must be a {...} list, not", currentLinkedListNode.print());
 
-  let jsReturnValue: string;
-  // @ts-ignore
-  with ([]) jsReturnValue = eval(jsCommand);
+  let jsReturnValue: string = Function(jsCommand)();
+  //with ([]) jsReturnValue = eval(jsCommand);
   if (!jsReturnValue) jsReturnValue = ops.nothing;
 
   // Convert back into an literal or tupleitem...

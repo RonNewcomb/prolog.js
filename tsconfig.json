@@ -8,7 +8,7 @@
         "moduleResolution": "Node",
         "allowJs": false,
         "skipLibCheck": true,
-        "module": "esnext",
+        "module": "ESNext",
         "resolveJsonModule": true,
         "noEmit": false,
         "alwaysStrict": false, // needed for with() statement

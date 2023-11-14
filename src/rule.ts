@@ -1,7 +1,7 @@
-import { ops } from "./interfaces";
-import type { Tokeniser } from "./tokenizer";
-import { Tuple, type TupleItem } from "./tupleItem";
-import { consoleOutError } from "./ui";
+import { ops } from "./interfaces.js";
+import type { Tokeniser } from "./tokenizer.js";
+import { Tuple, type TupleItem } from "./tupleItem.js";
+import { consoleOutError } from "./ui.js";
 
 export class Rule {
   head: Tuple | null;
