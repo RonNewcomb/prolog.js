@@ -5,6 +5,7 @@
             "DOM",
             "ES2021"
         ],
+        "outDir": "tmp",
         "moduleResolution": "Node",
         "allowJs": false,
         "skipLibCheck": true,

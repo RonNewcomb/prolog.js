@@ -1,8 +1,8 @@
 export default {
-    input: "src/main.js",
+    input: "tmp/main.js",
     output: {
         strict: false,
-        file: "./prolog.js",
+        file: "./tmp/prolog.js",
         format: "iife",
         generatedCode: "es2015",
     },
