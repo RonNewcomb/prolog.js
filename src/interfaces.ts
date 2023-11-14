@@ -2,7 +2,7 @@ import type { Environment } from "./environment";
 import type { Rule } from "./rule";
 import type { Tuple } from "./tupleItem";
 
-export type Database = Rule[] & { builtin?: { [key: string]: Functor } };
+export type Database = Rule[];
 export type FunctorResult = null | boolean;
 export interface ReportFunction {
   (env: Environment): void;

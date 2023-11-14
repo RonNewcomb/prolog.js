@@ -11,6 +11,15 @@ import { Tokeniser } from "./tokenizer";
 import { Tuple, type TupleItem, Literal } from "./tupleItem";
 import { consoleOutError, printDebugline } from "./ui";
 
+export const builtin = {
+  ["compare/3"]: Comparitor,
+  [ops.cutCommit + "/0"]: Commit,
+  ["ask/1"]: Ask,
+  [ops.failRollbackMoreAgain + "/0"]: More,
+  ["bagof/3"]: BagOf,
+  ["javascript/3"]: ExternalJS,
+};
+
 export function Commit(thisTuple: Tuple, goals: Tuple[], environment: Environment, db: Database, level: number, onReport: ReportFunction): FunctorResult {
   const ret = answerQuestion(goals, environment, db, level + 1, onReport); // On the way through, we do nothing... Just prove the rest of the goals, recursively.
   thisTuple.parent.commit = true; // Backtracking through the 'commit' stops any further attempts to prove this subgoal.

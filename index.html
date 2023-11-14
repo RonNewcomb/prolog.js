@@ -5,12 +5,12 @@
   </head>
   <body class="theme">
     <form name="input" action="javascript:return false;" class="toolbar">
-      <input type="checkbox" name="showparse" checked onclick="toggleEcholines()" id="showparse" /> <label for="showparse">Show parse results</label>
+      <input type="checkbox" name="showparse" checked id="showparse" /> <label for="showparse">Show parse results</label>
     </form>
     <div id="consoleout" ondblclick="document.getElementById('commandline').focus()">
       <div></div>
     </div>
-    <input type="text" id="commandline" onkeydown="onCommandlineKey(event, this);" style="width: 100%" />
+    <input type="text" id="commandline" style="width: 100%" />
     <script src="tmp/prolog.js"></script>
   </body>
 </html>

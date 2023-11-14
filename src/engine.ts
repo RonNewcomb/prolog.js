@@ -1,6 +1,6 @@
 import { Environment } from "./environment";
 import { type Database, type ReportFunction, type FunctorResult, ops } from "./interfaces";
-import { Comparitor, Commit, Ask, More, BagOf, ExternalJS } from "./library";
+import { builtin } from "./library";
 import { Rule } from "./rule";
 import { Tokeniser } from "./tokenizer";
 import { Tuple, type TupleItem, Variable } from "./tupleItem";
@@ -9,16 +9,6 @@ import { consoleOutError, printAnswerline, printEcholine } from "./ui";
 export const database: Database = [] as Database;
 (window as any).db = () => database.forEach(rule => console.log(rule.print()));
 console.info("enter db() to show the database");
-
-export function engine_init(): void {
-  database.builtin = {};
-  database.builtin["compare/3"] = Comparitor;
-  database.builtin[ops.cutCommit + "/0"] = Commit;
-  database.builtin["ask/1"] = Ask;
-  database.builtin[ops.failRollbackMoreAgain + "/0"] = More;
-  database.builtin["bagof/3"] = BagOf;
-  database.builtin["javascript/3"] = ExternalJS;
-}
 
 export function processLine(line: string): Database {
   const rule = Rule.parse(new Tokeniser(line));
@@ -75,8 +65,8 @@ export function answerQuestion(goals: Tuple[], env: Environment, db: Database, l
   const rest = goals.slice(1);
 
   // Do we have a builtin?
-  const builtin = db.builtin![first.name + "/" + (first.items.length - 1)];
-  if (builtin) return builtin(first, rest, env, db, level + 1, onReport);
+  const builtinfn = builtin[first.name + "/" + (first.items.length - 1)];
+  if (builtinfn) return builtinfn(first, rest, env, db, level + 1, onReport);
 
   for (const rule of db) {
     if (rule.head == null) continue; // then a query got stuck in there; it shouldn't have.

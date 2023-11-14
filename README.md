@@ -212,6 +212,8 @@ Instead of `[holds, 'box', the capacity], [something, the capacity, something el
 
 ## Try and Commit, Fail and Rollback
 
+Backtracking.
+
 ## Input, Output, and Committing
 
 I/O is tricky in a backtracking language. The execution will perform the I/O successfully, something later will break, backtrack before the I/O, then re-run the I/O on the next attempt, repeat.
@@ -219,24 +221,6 @@ I/O is tricky in a backtracking language. The execution will perform the I/O suc
 So I/O doesn't happen until the `commit` operator is passed, at which point all I/O is flushed.
 
 But what if the input is needed before the next commit? Well, if the input operation doesn't require any bound input vars or if those vars cannot be unbound then the input can happen immediately and self-cache. The next commit clears its cache.
-
-## You Are Not Your Name
-
-Variables are immutable but sometimes may not seem to be because the value of `the capacity` at the beginning of the function won't match its value at the end. The reason for that is that a variable has an existence separate from its name. `The capacity` at the end of the function isn't the same variable as `the capacity` at the end, it's the same _name_ on a different _variable_. The old immutable variable is still in scope, but bound to another name, `the capacity before processing`.
-
-Alternately, if a parameter-variable's name has the word `being` in it, it is a name _being_ continually re-bound.
-
-## Relative Clauses Invoke Functions and Search Structs
-
-Functions can be invoked with a relative clause of the form `the (type) which`. So for the relation `give a car to a person` we can use it like `the person which was given (the car) to` to return a person, while `the car which was given to (the person)` returns the appropriate car. The relative clause syntax allows asking for any single parameter as output when supplying the other parameters with input.
-
-It resembles a typical query of SQL or Prolog. And similar to both, the syntax can return a list rather than just the first value by prepending `each`, `every`, or `all the`. Otherwise, relative clauses assume there is only one value to return for a given set of inputs.
-
-## Multiple Return Values Can Be "Gone Gotten"
-
-A function can define a new local var which names an intermediate result. The caller can "go get" this value, giving us return values that weren't explicitly passed in or out. The name of the gotten value is similar to its name inside the function, but without the continuous tense. So if the full name of the variable inside the callee was `the money being traded away`, it's known to the caller as `the money traded away`. The usual way of getting a return value is still the relative clause, but for cases where it can't be used this is the way to go.
-
-The syntactic structure `before <verb>ing` refers to a variable's value as it was just before that (most recently) mentioned verb. So in the above example, we might want to say we started with `the money before trading`. Typically, it is assumed that any or all arguments to a function were changed, so the `before <verb>ing` syntax allows access to the immutable inputs.
 
 ## Compilation: Trying To Render Rules Redundant
 
@@ -284,6 +268,7 @@ maybe auto-vars. `the first card`, `the second card`, `the other cards` / `the r
 ### other
 
 `if not` = `unless`/`except if`
+
 `X if Y.` ...also `X while Y` or `X until Y` for temporal assertions?
 
 ### When function name = name of retval var => property
@@ -370,28 +355,3 @@ descends(wanda, tommie)
 Console: `Mother=martha Z=[jo,jo,ja,ja]; Mother=wanda Z=[tommie];`
 
 `setof` removes duplicates (and sorts, incidentally)
-
-### Constraint Satisfaction, not Constraint Solving.
-
-There are three categories of constraints. Unary constraints restrict the domain of a variable. Temporal constraints specify order of operations. The third and most important specifies invariant rules between variables via expressions as a tree of dependencies.
-
-Unary constraints can be preprocessed by altering the details of the variable's type. Temporal constraints merely sort invocations into a chronological ordering. It's the invariant constraints which are the diffcult ones. A lot of imperative coding just maintains invariants. "This should always be true" usually requires sprinkling a lot of checks, corrections, remedies, and exceptions all over the place. And sometimes the invariant must be broken in one specific place, because that place is the one telling the rest of the code that the invariant exists.
-
-First of all, Complish is concerned with constraint satisfaction, not constraint solving. Complish requires that most variables have an initial value, which it checks at compile-time to ensure invariant satisfaction from the get-go. Then Complish looks for cases where functions modify variables in a way that eventually violates the invariants. This involves a graph, the nodes of which are typed variables and the arcs are the constraints themselves. Although the constraints in said graph only allow binary constraints, higher-order constraints can be represented by a constellation of binary constraints.
-
-Functions should be viewed not as a list of instructions but as an invariant constraint. Functions can be evaluated for any combination of its parameters to return the unbound parameters in the same manner as struct relations can be searched by any set of values. And so, Complish should be able to calculate the allowed range of every parameter in the source at compile time. For mismatches between functions when one's range doesn't perfectly match the other's, Complish can either reduce the larger range to match the smaller, thereby reducing all its parameters indirectly and setting off a cascade, or complain to the user. Unsolvable equations demand the user define how that case should be handled.
-
-Constraints in the Kaleidoscope sense relate a duration of time to a declarative statement like X is an integer or Z is X + Y. Numerical formulae, boolean algebra, regexes, and mapping storage locations to types all can be part of a temporal constraint. A temporal constraint relates a duration to a (non-temporal) relation. Constraints which don't seem to relate to time relate to always. (Or next, in the imperative.)
-
-The before/after rules of Inform and AspectJ trivially fall under this umbrella: relating a named block of code to execute in relation to an inline block of code.
-
-The `precedes` keyword of Zarfian relates a description-of-rules to another description-of-rules, creating two ad-hoc groups of rules with a temporal ordering. Besides a rule specifically invoking another rule from within itself (at which point the callee was called a function), this keyword defines a sequencing of steps besides the metarule of 'most specific first'.
-
-All imperative blocks of code must be related, directly or indirectly, to a temporal word that hints at when that code runs. If a imperative block is named, the name must be used in another block, pushing back this problem a level. Eventually, the topmost block runs when the program is started, presumably `once` but possibly `always` or even `during` something else going on in the operating system.
-
-### notes
-
-- Declarative statements are always; imperative statements are after previous imperative statements.
-- Aspect-oriented rules and functional programming complement one another: one factors out side-effects while the other disallows side-effects.
-- When user code uses string.ToInt(), it is effectively calling a part of the compiler.
-- Method chaining is main-verb chaining.
