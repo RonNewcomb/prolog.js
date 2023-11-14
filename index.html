@@ -90,6 +90,31 @@
 
     <form name="rules" action="javascript:return false;" style="margin: 0; display: none">
       <textarea style="width: 100%" name="rules" id="loadthisnewfile">
+        
+# testing basics
+[holds, "bucket", 834, yes].
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 76, yes]?
+[holds, "bucket", the capacity, yes]?
+#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
+[holds, "bucket", ?, yes]
+[holds, "box", 411, no].
+[holds, "envelope", 1, yes].
+[holds, a container, a capacity, any whether]?
+
+# testing NOT
+[holds, "bucket", 834, yes]?
+[not, [holds, "bucket", 834, yes]]?
+[holds, "bucket", 76, yes]?
+[not, [holds, "bucket", 76, yes]]?
+
+# testing First item not special
+[Bob, dreams, big]
+[?, dreams, big]
+[Bob, ? , big]
+[Bob, dreams, ?]
+
+
 ### Accumulated standard library lives under here!
 
 # unification and [ x, y, z; w ] support
@@ -164,29 +189,6 @@
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
 
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
-
-# testing basics
-[holds, "bucket", 834, yes].
-[holds, "bucket", 834, yes]?
-[holds, "bucket", 76, yes]?
-[holds, "bucket", the capacity, yes]?
-#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
-[holds, "bucket", ?, yes]
-[holds, "box", 411, no].
-[holds, "envelope", 1, yes].
-[holds, a container, a capacity, any whether]?
-
-# testing NOT
-[holds, "bucket", 834, yes]?
-[not, [holds, "bucket", 834, yes]]?
-[holds, "bucket", 76, yes]?
-[not, [holds, "bucket", 76, yes]]?
-
-# testing First item not special
-[Bob, dreams, big]
-[?, dreams, big]
-[Bob, ? , big]
-[Bob, dreams, ?]
 
 </textarea
       >
