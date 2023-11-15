@@ -21,17 +21,18 @@ class FunctorIterator {
     this.first();
   }
 
-  first(): TupleItem | typeof NOMORE {
+  first(): FunctorIterator {
     this.i = 0;
     this.isDone = false;
-    return this.next();
+    this.next();
+    return this;
   }
 
-  next(): TupleItem | typeof NOMORE {
+  next(): FunctorIterator {
     if (this.areTheseTrue.length == 0 || this.isDone) {
       this.isDone = true;
       this.current = NOMORE;
-      return this.current;
+      return this;
     }
 
     const first = this.areTheseTrue[0];
@@ -46,29 +47,26 @@ class FunctorIterator {
       const nextGoals = rule.body ? rule.body.concat(rest) : rest;
 
       if (!this.subIter) this.subIter = new FunctorIterator(nextGoals, nextEnvironment, this.db);
-      if (this.subIter.isDone) continue;
-      return this.subIter.current;
+      if (this.subIter.isDone) {
+        this.subIter = undefined;
+        continue;
+      }
+      return this.subIter;
     }
 
     this.isDone = true;
     this.current = NOMORE;
-    return this.current;
+    return this;
   }
 
   rest(): TupleItem[] {
-    // this.first();
     const vals = [];
     while (!this.isDone) {
       const val = this.next();
-      if (val != NOMORE) vals.push(val);
+      if (val.current != NOMORE) vals.push(val.current);
     }
     return vals;
   }
-}
-
-export function beginLooking(areTheseTrue: Tuple[], scope: Environment, db: Database): FunctorIterator {
-  const newIterator = new FunctorIterator(areTheseTrue, scope, db);
-  return newIterator;
 }
 
 export function getAnswer(iter: FunctorIterator, areTheseTrue: Tuple[], scope: Environment, db: Database, level: number): FunctorIterator {
@@ -116,5 +114,5 @@ export function processLine(line: string): void {
     previousRun = new FunctorIterator(rule.body || [], new Environment(), database);
   }
   const result = previousRun.next();
-  printAnswerline(result == NOMORE ? "No." : result.print());
+  printAnswerline(result.current == NOMORE ? "No." : result.current.print());
 }
