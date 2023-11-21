@@ -1,83 +1,81 @@
-import { Environment } from "./environment";
-import { type Database } from "./interfaces";
-import { Rule } from "./rule";
-import { Tokeniser } from "./tokenizer";
-import { Tuple, type TupleItem } from "./tupleItem";
-import { consoleOutError, printAnswerline, printEcholine } from "./ui";
+import { printAnswerline, printEcholine } from "./ui";
+
+type Database = Rule[];
 
 export const NOMORE = Symbol("NOMORE");
 export const database: Database = [];
 
-console.info("enter db() to show the database");
-(window as any).db = () => database.forEach(rule => console.log(rule.print()));
+console.info("enter listing() to show the database");
+(window as any).listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
 
-class FunctorIterator {
-  current: TupleItem | typeof NOMORE = NOMORE;
-  i = 0;
-  isDone = false;
-  subIter: FunctorIterator | undefined;
+// class FunctorIterator {
+//   current: TupleItem | typeof NOMORE = NOMORE;
+//   i = 0;
+//   isDone = false;
+//   subIter: FunctorIterator | undefined;
 
-  constructor(private areTheseTrue: Tuple[], private scope: Environment, private db: Database) {
-    this.first();
-  }
+//   constructor(private areTheseTrue: Tuple[], private scope: Environment, private db: Database) {
+//     this.first();
+//   }
 
-  first(): FunctorIterator {
-    this.i = 0;
-    this.isDone = false;
-    this.next();
-    return this;
-  }
+//   first(): FunctorIterator {
+//     this.i = 0;
+//     this.isDone = false;
+//     this.next();
+//     return this;
+//   }
 
-  next(): FunctorIterator {
-    if (this.areTheseTrue.length == 0 || this.isDone) {
-      this.isDone = true;
-      this.current = NOMORE;
-      return this;
-    }
+//   next(): FunctorIterator {
+//     if (this.areTheseTrue.length == 0 || this.isDone) {
+//       this.isDone = true;
+//       this.current = NOMORE;
+//       return this;
+//     }
 
-    const first = this.areTheseTrue[0];
-    const rest = this.areTheseTrue.slice(1);
+//     const first = this.areTheseTrue[0];
+//     const rest = this.areTheseTrue.slice(1);
 
-    for (; this.db.length > this.i; this.i++) {
-      const rule = this.db[this.i];
+//     for (; this.db.length > this.i; this.i++) {
+//       const rule = this.db[this.i];
 
-      const nextEnvironment = this.scope.unify(first, rule.head); // try to unify the first of goals[] with this rule's head
-      if (nextEnvironment == null) continue; // no unify? try next rule in the db
+//       const nextEnvironment = this.scope.unify(first, rule.head); // try to unify the first of goals[] with this rule's head
+//       if (nextEnvironment == null) continue; // no unify? try next rule in the db
 
-      const nextGoals = rule.body ? rule.body.concat(rest) : rest;
+//       const nextGoals = rule.body ? rule.body.concat(rest) : rest;
 
-      if (!this.subIter) this.subIter = new FunctorIterator(nextGoals, nextEnvironment, this.db);
-      if (this.subIter.isDone) {
-        this.subIter = undefined;
-        continue;
-      }
-      return this.subIter;
-    }
+//       if (!this.subIter) this.subIter = new FunctorIterator(nextGoals, nextEnvironment, this.db);
+//       if (this.subIter.isDone) {
+//         this.subIter = undefined;
+//         continue;
+//       }
+//       return this.subIter;
+//     }
 
-    this.isDone = true;
-    this.current = NOMORE;
-    return this;
-  }
+//     this.isDone = true;
+//     this.current = NOMORE;
+//     return this;
+//   }
 
-  rest(): TupleItem[] {
-    const vals = [];
-    while (!this.isDone) {
-      const val = this.next();
-      if (val.current != NOMORE) vals.push(val.current);
-    }
-    return vals;
-  }
-}
+//   rest(): TupleItem[] {
+//     const vals = [];
+//     while (!this.isDone) {
+//       const val = this.next();
+//       if (val.current != NOMORE) vals.push(val.current);
+//     }
+//     return vals;
+//   }
+// }
 
 interface GraphNode {
+  //parent?: GraphNode;
   queryToProve: Tuple;
   database: Database;
   dbIndex: number; // backtracking increases this number; unification with head stops increasing it
-  rule: Rule; // === database[dbIndex]
-  headThatUnifies: Rule["head"];
-  vars: Scope | null; // the extra [] wrapper is to have pointers to the value
-  queryIndex: number; // rule.body[queryIndex] // backtracking decreases this number; unification increases it
-  querysToProve: GraphNode[];
+  //rule: Rule; // === database[dbIndex]
+  //headThatUnifies: Rule["rule"]["head"];
+  vars?: Scope; // the extra [] wrapper is to have pointers to the value
+  //queryIndex: number; // rule.body[queryIndex] // backtracking decreases this number; unification increases it
+  querysToProve?: GraphNode[];
 }
 
 /*
@@ -87,44 +85,98 @@ for every goal,
   if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
 */
 
-function go(root: GraphNode): GraphNode {
-  let current = root;
-  let state: "go" | "backtracking" = "go";
-
-  while (true) {
-    if (current.dbIndex == undefined) current.dbIndex = -1;
-
-    // ?
-    if (state == "backtracking") current.vars = null;
-
-    while (!current.vars) {
-      current.dbIndex++;
-      const nextrule = current.database[current.dbIndex];
-      if (!nextrule) return (state = "backtracking");
-      if (nextrule != current.rule) current.vars = null;
-      current.rule = nextrule;
-      current.vars = unify(current.vars, current.queryToProve, current.rule.head!);
-    }
-    // unnecessary?
-    current.headThatUnifies = current.rule.head!;
-
-    // ?
-    if (!current.rule.body) break;
-
-    if (current.queryIndex == undefined) {
-      current.queryIndex = 0;
-      current.querysToProve = (current.rule.body || []).map<GraphNode>(bodytuple => ({
-        queryToProve: bodytuple,
-        database: current.database,
-        dbIndex: 0,
-      }));
-    }
-
-    // do something with .querysToProve
-    current = current.querysToProve[current.queryIndex];
-  }
-  return root;
+const enum Direction {
+  Failing, // backtracking
+  Succeeded,
 }
+
+export function goer(current: GraphNode): Direction {
+  //if (current.dbIndex == undefined) current.dbIndex = -1;
+  //let state: Direction = Direction.Succeeded;
+
+  on_backtracking: do {
+    // find a rule in database that unifies with current .queryToProve (unification sets .vars)
+    if (!current.vars) {
+      let nextrule: Rule | undefined;
+      while (!current.vars) {
+        // get next rule to try
+        current.dbIndex++;
+        nextrule = current.database[current.dbIndex];
+
+        // if we ran out of rules to try, return failure.
+        if (!nextrule) return Direction.Failing;
+
+        // does it unify?
+        current.vars = unify(current.vars, { tupleitem: current.queryToProve }, { tupleitem: nextrule.rule.head! });
+      }
+
+      // found a rule that unified. If it had conditions, we will try those conditions
+      if (nextrule?.rule.body)
+        current.querysToProve = nextrule.rule.body.map<GraphNode>(t => ({
+          queryToProve: t,
+          database: current.database,
+          dbIndex: -1,
+        }));
+    }
+
+    // check children recursively, regardless whether this is a replay or they're fresh
+    if (current.querysToProve)
+      for (let query of current.querysToProve) {
+        // child returns success or failure.
+        const state = goer(query);
+        if (state == Direction.Succeeded) continue;
+
+        // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
+        current.vars = undefined;
+        current.querysToProve = [];
+        continue on_backtracking;
+      }
+  } while (false);
+
+  return Direction.Succeeded; // all children succeeded, so, I do too.
+}
+
+// export function go(root: GraphNode): GraphNode {
+//   let state: "go" | "backtracking" = "go";
+//   const location: number[] = []; // from the end of this array, from root, choose the nth child
+//   const current = location.reduceRight((sum, each) => sum.querysToProve[each], root);
+
+//   while (true) {
+//     if (current.dbIndex == undefined) current.dbIndex = -1;
+
+//     // ?
+//     if (state == "backtracking") current.vars = null;
+
+//     if (!current.vars) {
+//       let nextrule: Rule | undefined = undefined;
+//       while (!current.vars) {
+//         current.dbIndex++;
+//         nextrule = current.database[current.dbIndex];
+//         if (!nextrule) return (state = "backtracking");
+//         current.vars = unify(current.vars, { tupleitem: current.queryToProve }, { tupleitem: nextrule.rule.head! });
+//       }
+
+//       const query = nextrule?.rule.body || [];
+//       if (query.length) {
+//         //current.queryIndex = 0;
+//         current.querysToProve = query.map(
+//           bodytuple =>
+//             ({
+//               parent: current,
+//               queryToProve: bodytuple,
+//               database: current.database,
+//               dbIndex: 0,
+//             } as GraphNode)
+//         );
+//         location.push(0);
+//       } else {
+//         location[0]++;
+//         if (location[0] >= (current.parent?.querysToProve.length ?? 0)) location.shift();
+//       }
+//     }
+//   }
+//   return root;
+// }
 
 /*
 to get the Value of a tupleitem,
@@ -150,6 +202,68 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
+interface Literal {
+  literal: {
+    bareword?: string;
+    str?: string;
+    num?: number;
+    boo?: boolean;
+  };
+  variable?: undefined; // for typechecking
+  tuple?: undefined; // for typechecking
+}
+interface Variable {
+  variable: {
+    bareword: string;
+  };
+  literal?: undefined; // for typechecking
+  tuple?: undefined; // for typechecking
+}
+interface TupleItem {
+  tupleitem: Literal | Variable | Tuple;
+}
+interface Tuple {
+  tuple: TupleItem[];
+  variable?: undefined; // for typechecking
+  literal?: undefined; // for typechecking
+}
+interface Rule {
+  rule: {
+    head: Tuple;
+    body: Tuple[];
+  };
+}
+
+interface InputFile {
+  lines: Rule[];
+}
+
+const sample: InputFile = {
+  lines: [
+    {
+      rule: {
+        head: {
+          tuple: [
+            { tupleitem: { literal: { bareword: "drive" } } },
+            { tupleitem: { literal: { str: "bob" } } },
+            {
+              tupleitem: {
+                tuple: [
+                  {
+                    tupleitem: { literal: { bareword: "downtown" } },
+                  },
+                ],
+              },
+            },
+            { tupleitem: { variable: { bareword: "car" } } },
+          ],
+        },
+        body: [],
+      },
+    },
+  ],
+};
+
 type Scope = Record<string, [TupleItem]>;
 
 function newScope(oldScope: Scope | null, varName: string, tupleItem: TupleItem): Scope {
@@ -158,70 +272,46 @@ function newScope(oldScope: Scope | null, varName: string, tupleItem: TupleItem)
   return newScope;
 }
 
-function valueOf(item: TupleItem, scope: Scope): TupleItem {
-  if (item.literal) return item;
-  if (item.tupleitems) return new Tuple(item.tupleitems.map(i => valueOf(i, scope)));
-  // else item.variable
-  if (item.unbound) return item;
-  // else item.bound
-  return scope[item.variable][0];
+function newTuple(items: TupleItem[]): Tuple {
+  return { tuple: items };
 }
 
-function unify(scope: Scope | null, a: TupleItem, b: TupleItem): Scope | null {
-  if (scope == null) return null;
-  const x = valueOf(a, scope);
-  const y = valueOf(b, scope);
-  if (x.variable) return newScope(scope, x.variable, y);
-  if (y.variable) return newScope(scope, y.variable, x);
-  if (x.literal || y.literal) return x.literal == y.literal ? scope : null;
-  if (x.tupleitems.length != y.tupleitems.length) return null;
-  for (let i = 0; i < x.tupleitems.length; i++) scope = unify(scope, x.tupleitems[i], y.tupleitems[i]);
+function valueOf(tupleitem: TupleItem, scope: Scope): TupleItem {
+  const item = tupleitem.tupleitem;
+  if (item.literal) return tupleitem;
+  if (item.tuple)
+    return {
+      tupleitem: newTuple(item.tuple.map(it => valueOf(it, scope))),
+    };
+  // else item.variable  // else item.bound
+  const isBoundVar = scope[item.variable.bareword];
+  return isBoundVar ? isBoundVar[0] : tupleitem;
+}
+
+function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | undefined {
+  if (scope == null) return undefined;
+  const x = valueOf(a, scope).tupleitem;
+  const y = valueOf(b, scope).tupleitem;
+  if (x.variable) return newScope(scope, x.variable.bareword, { tupleitem: y });
+  if (y.variable) return newScope(scope, y.variable.bareword, { tupleitem: x });
+  if (x.literal || y.literal) return x.literal == y.literal ? scope : undefined;
+  if (x.tuple.length != y.tuple.length) return undefined;
+  for (let i = 0; i < x.tuple.length; i++) scope = unify(scope, x.tuple[i], y.tuple[i]);
   return scope;
 }
 
-export function getAnswer(iter: FunctorIterator, areTheseTrue: Tuple[], scope: Environment, db: Database, level: number): FunctorIterator {
-  if (level > 99) {
-    consoleOutError(null, "maximum recursion depth of 99 exceeded");
-    iter.isDone = true;
-    iter.current = NOMORE;
-    return iter;
-  }
+let previousRun = new FunctorIterator([], {}, database);
 
-  if (areTheseTrue.length == 0) {
-    iter.isDone = true;
-    iter.current = NOMORE;
-    return iter;
-  }
-
-  const first = areTheseTrue[0];
-  const rest = areTheseTrue.slice(1);
-
-  while (db.length > iter.i) {
-    const rule = db[iter.i];
-    iter.i++;
-
-    const nextEnvironment = scope.unify(first, rule.head); // try to unify the first of goals[] with this rule's head
-    if (nextEnvironment == null) continue; // no unify? try next rule in the db
-
-    const nextGoals = (rule.body || []).concat(rest);
-    const updatedIter = getAnswer(iter, nextGoals, nextEnvironment, db, level + 1);
-  }
-  return iter;
-}
-
-let previousRun = new FunctorIterator([], new Environment(), database);
-
-export function processLine(line: string): void {
-  if (line != "more") {
-    const rule = Rule.parse(new Tokeniser(line));
+export function processLine(rule: Rule): void {
+  if (rule.rule.head.tuple[0].tupleitem.literal?.bareword != "more") {
     if (rule == null) return;
-    printEcholine(rule.print());
-    if (!rule.asking) {
+    printEcholine(JSON.stringify(rule));
+    if (!rule.rule.body || rule.rule.body.length == 0) {
       database.push(rule);
       printAnswerline("Memorized.\n");
       return;
     }
-    previousRun = new FunctorIterator(rule.body || [], new Environment(), database);
+    previousRun = new FunctorIterator(rule.rule.body || [], {}, database);
   }
   const result = previousRun.next();
   printAnswerline(result.current == NOMORE ? "No." : result.current.print());
