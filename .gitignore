@@ -1,2 +1,4 @@
 *.js
 tmp/
+!projama.js
+node_modules

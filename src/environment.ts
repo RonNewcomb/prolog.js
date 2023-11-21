@@ -3,9 +3,7 @@ import { type TupleItem, Tuple, Variable } from "./tupleItem";
 import { printAnswerline } from "./ui";
 
 export class Environment {
-  contents: {
-    [name: string]: TupleItem;
-  };
+  contents: Record<string, TupleItem>;
 
   constructor(oldEnvironment?: Environment) {
     this.contents = Object.create(oldEnvironment?.contents || null);
