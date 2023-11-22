@@ -1,9 +1,58 @@
 import { printAnswerline, printEcholine } from "./ui";
 
+interface Literal {
+  literal: {
+    bareword?: string;
+    str?: string;
+    num?: number;
+    boo?: boolean;
+  };
+  variable?: never; // for typechecking
+  tuple?: never; // for typechecking
+}
+interface Variable {
+  variable: {
+    bareword: string;
+  };
+  literal?: never; // for typechecking
+  tuple?: never; // for typechecking
+}
+type TupleItem = Literal | Variable | Tuple;
+interface Tuple {
+  tuple: TupleItem[];
+  variable?: never; // for typechecking
+  literal?: never; // for typechecking
+}
+interface Rule {
+  head: Tuple;
+  query: Tuple[];
+}
+interface InputFile {
+  lines: Rule[];
+}
+
+const sample2: InputFile = {
+  lines: [
+    {
+      head: {
+        tuple: [
+          { literal: { bareword: "drive" } },
+          { literal: { str: "bob" } },
+          {
+            tuple: [{ literal: { bareword: "downtown" } }],
+          },
+          { variable: { bareword: "car" } },
+        ],
+      },
+      query: [],
+    },
+  ],
+};
+
+type Scope = Record<string, [TupleItem]>;
 type Database = Rule[];
 
-export const NOMORE = Symbol("NOMORE");
-export const database: Database = [];
+const database: Database = [];
 
 console.info("enter listing() to show the database");
 (window as any).listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
@@ -20,6 +69,11 @@ interface GraphNode {
   querysToProve?: GraphNode[];
 }
 
+const enum Direction {
+  Failing, // backtracking
+  Succeeded,
+}
+
 /*
 for every goal, 
   find [the next] rule in the database which unifies with its head 
@@ -27,16 +81,19 @@ for every goal,
   if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
 */
 
-const enum Direction {
-  Failing, // backtracking
-  Succeeded,
-}
+let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
-function succeeds(database: Database, queryToProve?: Tuple): boolean {
-  const node: GraphNode = queryToProve ? { queryToProve, database, dbIndex: -1 } : previousRun;
-  const result = goer(node);
-  previousRun = node;
-  return result === Direction.Succeeded;
+export function ask(database: Database, querysToProve?: Tuple[]): boolean {
+  previousRun = querysToProve
+    ? <GraphNode>{
+        queryToProve: { tuple: [] },
+        database,
+        dbIndex: -1,
+        vars: {},
+        querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
+      }
+    : previousRun;
+  return goer(previousRun) === Direction.Succeeded;
 }
 
 function goer(current: GraphNode): Direction {
@@ -110,57 +167,6 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
-interface Literal {
-  literal: {
-    bareword?: string;
-    str?: string;
-    num?: number;
-    boo?: boolean;
-  };
-  variable?: never; // for typechecking
-  tuple?: never; // for typechecking
-}
-interface Variable {
-  variable: {
-    bareword: string;
-  };
-  literal?: never; // for typechecking
-  tuple?: never; // for typechecking
-}
-type TupleItem = Literal | Variable | Tuple;
-interface Tuple {
-  tuple: TupleItem[];
-  variable?: never; // for typechecking
-  literal?: never; // for typechecking
-}
-interface Rule {
-  head: Tuple;
-  query: Tuple[];
-}
-interface InputFile {
-  lines: Rule[];
-}
-
-const sample2: InputFile = {
-  lines: [
-    {
-      head: {
-        tuple: [
-          { literal: { bareword: "drive" } },
-          { literal: { str: "bob" } },
-          {
-            tuple: [{ literal: { bareword: "downtown" } }],
-          },
-          { variable: { bareword: "car" } },
-        ],
-      },
-      query: [],
-    },
-  ],
-};
-
-type Scope = Record<string, [TupleItem]>;
-
 function newScope(oldScope: Scope | null, varName: string, tupleItem: TupleItem): Scope {
   const newScope = Object.create(oldScope);
   newScope[varName] = tupleItem;
@@ -190,8 +196,6 @@ function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | un
   return scope;
 }
 
-let previousRun: GraphNode | undefined;
-
 export function processLine(rule: Rule): void {
   let result = false;
   if (rule.head.tuple[0].literal?.bareword != "more") {
@@ -202,7 +206,7 @@ export function processLine(rule: Rule): void {
       printAnswerline("Memorized.\n");
       return;
     }
-    result = succeeds(database, rule.query!);
-  } else result = succeeds(database);
-  printAnswerline(!result ? "No." : previousRun?.vars.print());
+    result = ask(database, rule.query);
+  } else result = ask(database);
+  printAnswerline(!result ? "No." : JSON.stringify(previousRun.vars));
 }
