@@ -1,12 +1,16 @@
+const commandLineEl = document.getElementById("commandline")! as HTMLInputElement;
+
 const toggleStyleEl = document.createElement("style")! as HTMLStyleElement;
 toggleStyleEl.id = "toggleStyleEl";
 document.head.appendChild(toggleStyleEl);
 
-document.getElementById("showparse")!.addEventListener("click", event => {
-  const checkbox = event.target as HTMLInputElement;
-  toggleStyleEl.innerText = checkbox.checked ? ".echodiv { }" : ".echodiv { display: none !important; }";
+const showParseCheckboxEl = document.getElementById("showparse")! as HTMLInputElement;
+function setEcho() {
+  toggleStyleEl.innerText = showParseCheckboxEl.checked ? ".echodiv { }" : ".echodiv { display: none !important; }";
   commandLineEl.focus();
-});
+}
+showParseCheckboxEl.addEventListener("click", setEcho);
+setEcho();
 
 const consoleOutEl = document.getElementById("consoleout")! as HTMLDivElement;
 
@@ -46,7 +50,6 @@ export function consoleOutError(str: string): null {
 const previousInput: string[] = [];
 let previousInputIndex = 0;
 
-const commandLineEl = document.getElementById("commandline")! as HTMLInputElement;
 commandLineEl.addEventListener("keydown", event => {
   const input = event.target as HTMLInputElement;
   switch (event.key) {

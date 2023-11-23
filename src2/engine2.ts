@@ -1,13 +1,13 @@
 import { consoleOutError, printAnswerline, printEcholine, registerProcessLine } from "./ui";
 import { Parser, Grammar } from "nearley";
-import "../../src2/projama.js";
+import "../../src2/projama.js"; // found from /tmp/src2/engine2.js
 
-const grammar = (window as any).grammar;
+const grammar = (window as any).grammar; // created by iife in projama.js
 
 interface Literal {
   literal: {
-    rtype: "bareword" | "string" | "number" | "boolean";
     rvalue: string | number | boolean;
+    rtype: "bareword" | "string" | "number" | "boolean";
     bareword?: string;
   };
   variable?: never; // for typechecking
@@ -179,30 +179,32 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
-function newScope(oldScope: Scope | undefined, varName: string, tupleItem: TupleItem): Scope {
+function addToScope(oldScope: Scope | undefined, varName: string, tupleItem: TupleItem): Scope {
+  // a new scope is subclassed to ease rollbacking the assignment to varName
   const newScope = Object.create(oldScope || null) as Scope;
+  // the value is wrapped in an [...] so we can use references when many vars point to each other and only the last to the tuple/literal
   newScope[varName] = [tupleItem];
   return newScope;
 }
 
-function newTuple(items: TupleItem[]): Tuple {
-  return { tuple: items };
-}
-
 function valueOf(item: TupleItem, scope: Scope): TupleItem {
+  // value of a literal is itself
   if (item.literal) return item;
-  if (item.tuple) return newTuple(item.tuple.map(it => valueOf(it, scope)));
+  // value of a tuple is a tuple of the values of each item in the tuple
+  if (item.tuple) return { tuple: item.tuple.map(it => valueOf(it, scope)) };
+  // value of a bound var is the literal or tuple its bound to
   const isBoundVar = scope[item.variable.bareword];
+  // value of an unbound var is itself
   return isBoundVar ? isBoundVar[0] : item;
 }
 
 function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | undefined {
-  if (scope == undefined) return undefined;
+  if (!scope) return undefined;
   const x = valueOf(a, scope);
   const y = valueOf(b, scope);
   // console.log("trying to unify", x, "with", y);
-  if (x.variable) return newScope(scope, x.variable.bareword, y);
-  if (y.variable) return newScope(scope, y.variable.bareword, x);
+  if (x.variable) return addToScope(scope, x.variable.bareword, y);
+  if (y.variable) return addToScope(scope, y.variable.bareword, x);
   if (x.literal || y.literal) return x.literal!.rvalue == y.literal!.rvalue ? scope : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
   for (let i = 0; i < x.tuple.length; i++) scope = unify(scope, x.tuple[i], y.tuple[i]);
@@ -216,18 +218,20 @@ interface ErrorShape {
 
 registerProcessLine(line => {
   try {
-    const parser = new Parser(Grammar.fromCompiled(grammar));
-    const { results } = parser.feed(line);
-    const interpretations: InputFile[] = results;
-    //console.warn(interpretations);
-    const inputfile: InputFile = interpretations[interpretations.length - 1];
-    //console.log(inputfile.lines);
-    const rule = inputfile.lines.pop();
-    console.log(JSON.stringify(rule));
-    //return processLine(rule!);
     let query: Tuple[] | undefined = undefined;
-    let result = false;
-    if (rule?.head?.tuple?.[0].literal?.bareword != "more") {
+    if (line == "listing") {
+      database.forEach(rule => printAnswerline(JSON.stringify(rule)));
+      return;
+    }
+    if (line != "more") {
+      const parser = new Parser(Grammar.fromCompiled(grammar));
+      const { results } = parser.feed(line);
+      const interpretations: InputFile[] = results;
+      if (interpretations.length) console.warn("WARNING: multiple interpretations");
+      const inputfile: InputFile = interpretations[interpretations.length - 1];
+      //console.log(inputfile.lines);
+      const rule = inputfile.lines.pop();
+      //console.log(JSON.stringify(rule));
       if (!rule) return;
       printEcholine(JSON.stringify(rule));
       if (rule.head) {
@@ -235,10 +239,9 @@ registerProcessLine(line => {
         printAnswerline("Memorized.\n");
         return;
       }
-      //console.log("QUERY", JSON.stringify(rule.query));
       query = rule.query;
     }
-    result = ask(database, query);
+    const result = ask(database, query);
     printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
     //console.log(previousRun);
   } catch (e: any) {
