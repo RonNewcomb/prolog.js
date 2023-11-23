@@ -20,6 +20,8 @@ Memorized.
 Memorized.
 [holds, the container, the capacity, the whether]?
 The whether is yes.
+The capacity is 834.
+The container is "bucket".
 [holds, "bucket", 7, yes].
 Memorized.
 [holds, "bucket", the capacity, yes]?

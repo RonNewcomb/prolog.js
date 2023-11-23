@@ -250,13 +250,15 @@ registerProcessLine(line => {
 });
 
 function prettyPrintVarBindings(scope: Scope): string {
-  const vars = Object.keys(scope);
+  const vars = [];
+  for (let v in scope) vars.push(v);
   console.log(JSON.stringify(vars));
   if (vars.length == 0) return "Yes";
   return vars
     .map(varName => {
       const container = scope[varName][0];
-      const val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
+      let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
+      if (container.literal?.rtype == "string") val = `"${val}"`;
       return `The ${varName} is ${val}.`;
     })
     .join("\n");
