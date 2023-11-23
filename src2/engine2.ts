@@ -6,7 +6,7 @@ const grammar = (window as any).grammar; // created by iife in projama.js
 
 interface Literal {
   literal: {
-    rvalue: string | number | boolean;
+    rvalue: string | number | boolean | symbol;
     rtype: "bareword" | "string" | "number" | "boolean";
     bareword?: string;
   };
@@ -62,20 +62,18 @@ const sample2: InputFile = {
 type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
 type Database = Rule[];
 
-const database: Database = [];
+const headless: Tuple = { tuple: [{ literal: { rvalue: Symbol("REPL"), rtype: "bareword", bareword: "REPL" } }] };
+const repl: Rule = { head: headless, query: [] };
+const database: Database = [repl];
 
 console.info("enter listing() to show the database");
 (window as any).listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
 
 interface GraphNode {
-  //parent?: GraphNode;
   queryToProve: Tuple;
   database: Database;
   dbIndex: number; // backtracking increases this number; unification with head stops increasing it
-  //rule: Rule; // === database[dbIndex]
-  //headThatUnifies: Rule["rule"]["head"];
   vars?: Scope;
-  //queryIndex: number; // rule.body[queryIndex] // backtracking decreases this number; unification increases it
   querysToProve?: GraphNode[];
 }
 
@@ -91,24 +89,20 @@ for every goal,
   if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
 */
 
-let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
+// previousRun supports the MORE command
+let previousRun: GraphNode = { queryToProve: repl.head!, database, dbIndex: -1 };
 
 export function ask(database: Database, querysToProve?: Tuple[]): boolean {
-  previousRun = querysToProve
-    ? <GraphNode>{
-        queryToProve: querysToProve[0],
-        database,
-        dbIndex: -1,
-        // vars: {},
-        // querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
-      }
-    : previousRun;
+  if (querysToProve) {
+    repl.query = querysToProve;
+    previousRun = <GraphNode>{ queryToProve: repl.head, database, dbIndex: -1 };
+  }
   return goer(previousRun) === Direction.Succeeded;
 }
 
 export function failThatAnswer(current: GraphNode): void {
   if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
-  else current.vars = undefined;
+  else current.vars = undefined; // right-most leaf node only
 }
 
 function goer(current: GraphNode): Direction {
@@ -152,6 +146,7 @@ function goer(current: GraphNode): Direction {
       if (state == Direction.Succeeded) continue;
 
       // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
+      // console.log("Backtracking because child failed");
       current.vars = undefined;
       continue on_backtracking; // javascript's weird way of doing a GOTO
     }
@@ -207,7 +202,7 @@ function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | un
   if (!scope) return undefined;
   const x = valueOf(a, scope);
   const y = valueOf(b, scope);
-  // console.log("trying to unify", x, "with", y);
+  //console.log("trying to unify", x, "with", y);
   if (x.variable) return addToScope(scope, x.variable.bareword, y);
   if (y.variable) return addToScope(scope, y.variable.bareword, x);
   if (x.literal || y.literal) return x.literal!.rvalue == y.literal!.rvalue ? scope : undefined;
@@ -248,7 +243,7 @@ registerProcessLine(line => {
       query = rule.query;
     }
     const result = ask(database, query);
-    printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
+    printAnswerline(!result || !previousRun.vars ? "No." : prettyPrintVarBindings(previousRun.vars));
     //console.log(previousRun);
   } catch (e: any) {
     consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));
@@ -257,15 +252,15 @@ registerProcessLine(line => {
 
 function prettyPrintVarBindings(scope: Scope): string {
   const vars = [];
-  for (let v in scope) vars.push(v);
+  for (let v in scope) vars.push(v); // must do this to see the inherited properties
   console.log(JSON.stringify(vars));
-  if (vars.length == 0) return "Yes";
+  if (vars.length == 0) return "Yes...";
   return vars
     .map(varName => {
       const container = scope[varName][0];
-      let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
-      if (container.literal?.rtype == "string") val = `"${val}"`;
-      return `The ${varName} is ${val}.`;
+      let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : `the ${container.variable.bareword}`;
+      if (container.literal?.rtype == "string") val = `"${String(val)}"`;
+      return `The ${varName} is ${String(val)}.`;
     })
     .join("\n");
 }

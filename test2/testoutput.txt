@@ -9,7 +9,7 @@ Yes
 [holds, "bucket", 76, yes]?
 No.
 [holds, "bucket", the capacity, yes]?
-The capacity is 834.
+Yes
 #[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
 👍
 #[holds, "bucket", ?, yes] #unimplemented
@@ -19,15 +19,13 @@ Memorized.
 [holds, "envelope", 1, yes].
 Memorized.
 [holds, the container, the capacity, the whether]?
-The whether is yes.
-The capacity is 834.
-The container is "bucket".
+Yes
 [holds, "bucket", 7, yes].
 Memorized.
 [holds, "bucket", the capacity, yes]?
-The capacity is 834.
+Yes
 more
-The capacity is 7.
+Yes
 more
 No.
 more
