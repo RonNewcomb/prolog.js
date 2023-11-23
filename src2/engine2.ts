@@ -1,4 +1,12 @@
-import { printAnswerline, printEcholine } from "./ui";
+import { printAnswerline, printEcholine, registerProcessLine } from "./ui";
+import { Parser, Grammar } from "nearley";
+//const nearley = require("nearley");
+//const grammar = require("./grammar.js");
+import "../../src2/projama.js";
+
+// const Parser = nearley.Parser;
+// const Grammar = nearley.Grammar;
+const grammar = (window as any).grammar;
 
 interface Literal {
   literal: {
@@ -38,9 +46,7 @@ const sample2: InputFile = {
         tuple: [
           { literal: { bareword: "drive" } },
           { literal: { str: "bob" } },
-          {
-            tuple: [{ literal: { bareword: "downtown" } }],
-          },
+          { tuple: [{ literal: { bareword: "downtown" } }] },
           { variable: { bareword: "car" } },
         ],
       },
@@ -49,7 +55,7 @@ const sample2: InputFile = {
   ],
 };
 
-type Scope = Record<string, [TupleItem]>;
+type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
 type Database = Rule[];
 
 const database: Database = [];
@@ -64,7 +70,7 @@ interface GraphNode {
   dbIndex: number; // backtracking increases this number; unification with head stops increasing it
   //rule: Rule; // === database[dbIndex]
   //headThatUnifies: Rule["rule"]["head"];
-  vars?: Scope; // the extra [] wrapper is to have pointers to the value
+  vars?: Scope;
   //queryIndex: number; // rule.body[queryIndex] // backtracking decreases this number; unification increases it
   querysToProve?: GraphNode[];
 }
@@ -210,3 +216,21 @@ export function processLine(rule: Rule): void {
   } else result = ask(database);
   printAnswerline(!result ? "No." : JSON.stringify(previousRun.vars));
 }
+
+// Create a Parser object from our grammar.
+const parser = new Parser(Grammar.fromCompiled(grammar));
+
+// test
+// parser.feed("[drive].");
+// console.log(JSON.stringify(parser.results));
+
+registerProcessLine(line => {
+  const { results } = parser.feed(line);
+  const inputfile: InputFile = results[0];
+  console.log(inputfile.lines);
+  const rule = inputfile.lines[0];
+  console.log(rule);
+  return processLine(rule);
+});
+
+// `tsc && rollup -c`
