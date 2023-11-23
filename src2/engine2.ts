@@ -6,10 +6,9 @@ const grammar = (window as any).grammar;
 
 interface Literal {
   literal: {
+    rtype: "bareword" | "string" | "number" | "boolean";
+    rvalue: string | number | boolean;
     bareword?: string;
-    str?: string;
-    num?: number;
-    boo?: boolean;
   };
   variable?: never; // for typechecking
   tuple?: never; // for typechecking
@@ -28,8 +27,8 @@ interface Tuple {
   literal?: never; // for typechecking
 }
 interface Rule {
-  head: Tuple;
-  query: Tuple[];
+  head?: Tuple;
+  query?: Tuple[];
 }
 interface InputFile {
   lines: Rule[];
@@ -38,15 +37,24 @@ interface InputFile {
 const sample2: InputFile = {
   lines: [
     {
-      head: {
-        tuple: [
-          { literal: { bareword: "drive" } },
-          { literal: { str: "bob" } },
-          { tuple: [{ literal: { bareword: "downtown" } }] },
-          { variable: { bareword: "car" } },
-        ],
-      },
-      query: [],
+      query: [
+        {
+          tuple: [
+            {
+              literal: {
+                rtype: "bareword",
+                rvalue: "holds",
+                bareword: "holds",
+              },
+            },
+            { literal: { rtype: "string", rvalue: "bucket" } },
+            { literal: { rtype: "number", rvalue: "834" } },
+            {
+              literal: { rtype: "bareword", rvalue: "yes", bareword: "yes" },
+            },
+          ],
+        },
+      ],
     },
   ],
 };
@@ -88,11 +96,11 @@ let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -
 export function ask(database: Database, querysToProve?: Tuple[]): boolean {
   previousRun = querysToProve
     ? <GraphNode>{
-        queryToProve: { tuple: [] },
+        queryToProve: querysToProve[0],
         database,
         dbIndex: -1,
-        vars: {},
-        querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
+        // vars: {},
+        // querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
       }
     : previousRun;
   return goer(previousRun) === Direction.Succeeded;
@@ -117,8 +125,10 @@ function goer(current: GraphNode): Direction {
         if (!nextrule) return Direction.Failing;
 
         // does it unify?
-        current.vars = unify(current.vars, current.queryToProve, nextrule.head!);
+        current.vars = unify(current.vars || {}, current.queryToProve, nextrule.head!);
       }
+
+      // console.log("UNIFIED with rule #", current.dbIndex);
 
       // we found a rule that unified. If it had conditions, we will try those conditions
       if (nextrule!.query)
@@ -169,9 +179,9 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
-function newScope(oldScope: Scope | null, varName: string, tupleItem: TupleItem): Scope {
-  const newScope = Object.create(oldScope);
-  newScope[varName] = tupleItem;
+function newScope(oldScope: Scope | undefined, varName: string, tupleItem: TupleItem): Scope {
+  const newScope = Object.create(oldScope || null) as Scope;
+  newScope[varName] = [tupleItem];
   return newScope;
 }
 
@@ -187,31 +197,16 @@ function valueOf(item: TupleItem, scope: Scope): TupleItem {
 }
 
 function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | undefined {
-  if (scope == null) return undefined;
+  if (scope == undefined) return undefined;
   const x = valueOf(a, scope);
   const y = valueOf(b, scope);
+  // console.log("trying to unify", x, "with", y);
   if (x.variable) return newScope(scope, x.variable.bareword, y);
   if (y.variable) return newScope(scope, y.variable.bareword, x);
-  if (x.literal || y.literal) return x.literal == y.literal ? scope : undefined;
+  if (x.literal || y.literal) return x.literal!.rvalue == y.literal!.rvalue ? scope : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
   for (let i = 0; i < x.tuple.length; i++) scope = unify(scope, x.tuple[i], y.tuple[i]);
   return scope;
-}
-
-export function processLine(rule: Rule): void {
-  let result = false;
-  if (rule.head?.tuple?.[0].literal?.bareword != "more") {
-    if (rule == null) return;
-    printEcholine(JSON.stringify(rule));
-    if (rule.head) {
-      database.push(rule);
-      printAnswerline("Memorized.\n");
-      return;
-    }
-    //console.log("QUERY", JSON.stringify(rule.query));
-    result = ask(database, rule.query);
-  } else result = ask(database);
-  printAnswerline(!result ? "No." : previousRun.vars ? JSON.stringify(previousRun.vars) : "Yes.");
 }
 
 interface ErrorShape {
@@ -224,15 +219,44 @@ registerProcessLine(line => {
     const parser = new Parser(Grammar.fromCompiled(grammar));
     const { results } = parser.feed(line);
     const interpretations: InputFile[] = results;
-    console.warn(interpretations);
+    //console.warn(interpretations);
     const inputfile: InputFile = interpretations[interpretations.length - 1];
     //console.log(inputfile.lines);
     const rule = inputfile.lines.pop();
-    console.log(rule);
-    return processLine(rule!);
+    console.log(JSON.stringify(rule));
+    //return processLine(rule!);
+    let query: Tuple[] | undefined = undefined;
+    let result = false;
+    if (rule?.head?.tuple?.[0].literal?.bareword != "more") {
+      if (!rule) return;
+      printEcholine(JSON.stringify(rule));
+      if (rule.head) {
+        database.push(rule);
+        printAnswerline("Memorized.\n");
+        return;
+      }
+      //console.log("QUERY", JSON.stringify(rule.query));
+      query = rule.query;
+    }
+    result = ask(database, query);
+    printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
+    //console.log(previousRun);
   } catch (e: any) {
     consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));
   }
 });
+
+function prettyPrintVarBindings(scope: Scope): string {
+  const vars = Object.keys(scope);
+  console.log(JSON.stringify(vars));
+  if (vars.length == 0) return "Yes";
+  return vars
+    .map(varName => {
+      const container = scope[varName][0];
+      const val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
+      return `The ${varName} is ${val}.`;
+    })
+    .join("\n");
+}
 
 // `tsc && rollup -c`
