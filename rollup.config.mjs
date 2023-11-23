@@ -8,6 +8,7 @@ export default {
         file: "./tmp/prolog.js",
         format: "iife",
         generatedCode: "es2015",
+        name: "projamas",
     },
     plugins: [
         commonjs({

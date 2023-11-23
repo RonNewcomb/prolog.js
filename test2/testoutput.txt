@@ -1,176 +1,168 @@
  Show parse results
-Fetching test/testinput.txt
+Fetching test2/testinput.txt
 # testing basics
 👍
 [holds, "bucket", 834, yes].
-[holds, "bucket", 834, yes] .
+{"head":{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"834"}},{"literal":{"bareword":"yes"}}]},"query":[]}
 Memorized.
 [holds, "bucket", 834, yes]?
-[holds, "bucket", 834, yes] ?
+{"query":[{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"834"}},{"literal":{"bareword":"yes"}}]}]}
 Yes.
 [holds, "bucket", 76, yes]?
-[holds, "bucket", 76, yes] ?
-No.
+{"query":[{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"76"}},{"literal":{"bareword":"yes"}}]}]}
+Yes.
 [holds, "bucket", the capacity, yes]?
-[holds, "bucket", the capacity, yes] ?
-The capacity is 834.
+{"query":[{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"variable":{"bareword":"capacity"}},{"literal":{"bareword":"yes"}}]}]}
+Yes.
 #[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
 👍
 [holds, "bucket", ?, yes]
-[holds, "bucket", the ?, yes] ?
-834.
+ERROR: {"offset":18,"token":{"value":"?"}}
+ 
 [holds, "box", 411, no].
-[holds, "box", 411, no] .
+{"head":{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"box"}},{"literal":{"num":"411"}},{"literal":{"bareword":"no"}}]},"query":[]}
 Memorized.
 [holds, "envelope", 1, yes].
-[holds, "envelope", 1, yes] .
+{"head":{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"envelope"}},{"literal":{"num":"1"}},{"literal":{"bareword":"yes"}}]},"query":[]}
 Memorized.
 [holds, a container, a capacity, any whether]?
-[holds, the container, the capacity, the whether] ?
-The container is "bucket".
-The capacity is 834.
-The whether is yes.
-The container is "box".
-The capacity is 411.
-The whether is no.
-The container is "envelope".
-The capacity is 1.
-The whether is yes.
+ERROR: {"offset":10,"token":{"value":"c"}}
+ 
 # testing NOT
 👍
 [holds, "bucket", 834, yes]?
-[holds, "bucket", 834, yes] ?
+{"query":[{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"834"}},{"literal":{"bareword":"yes"}}]}]}
 Yes.
 [not, [holds, "bucket", 834, yes]]?
-[not, [holds, "bucket", 834, yes]] ?
-No.
+{"query":[{"tuple":[{"literal":{"bareword":"not"}},{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"834"}},{"literal":{"bareword":"yes"}}]}]}]}
+Yes.
 [holds, "bucket", 76, yes]?
-[holds, "bucket", 76, yes] ?
-No.
+{"query":[{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"76"}},{"literal":{"bareword":"yes"}}]}]}
+Yes.
 [not, [holds, "bucket", 76, yes]]?
-[not, [holds, "bucket", 76, yes]] ?
-No.
+{"query":[{"tuple":[{"literal":{"bareword":"not"}},{"tuple":[{"literal":{"bareword":"holds"}},{"literal":{"str":"bucket"}},{"literal":{"num":"76"}},{"literal":{"bareword":"yes"}}]}]}]}
+Yes.
 # testing First item not special
 👍
 [Bob, dreams, big]
-[Bob, dreams, big] .
-Memorized.
+ERROR: {}
+ 
 [?, dreams, big]
-[the ?, dreams, big] ?
-Bob.
+ERROR: {"offset":1,"token":{"value":"?"}}
+ 
 [Bob, ? , big]
-[Bob, the ?, big] ?
-dreams.
+ERROR: {"offset":6,"token":{"value":"?"}}
+ 
 [Bob, dreams, ?]
-[Bob, dreams, the ?] ?
-big.
+ERROR: {"offset":14,"token":{"value":"?"}}
+ 
 ### Accumulated standard library lives under here!
 👍
 # unification and [ x, y, z; w ] support
 👍
 [unify, an xxx, an xxx].
-[unify, the xxx, the xxx] .
-Memorized.
+ERROR: {"offset":11,"token":{"value":"x"}}
+ 
 # [ a, b, c ] --> [and, {a, b, c}]
 👍
 [and, {}].
-[and, nothing] .
-Memorized.
+ERROR: {"offset":6,"token":{"value":"{"}}
+ 
 [and, {a question | the rest}] if [ask, the question], [and, the rest].
-[and, {the question | the rest}] if [ask, the question], [and, the rest] .
-Memorized.
+ERROR: {"offset":6,"token":{"value":"{"}}
+ 
 # [ a; b; c ] --> [or, {a, b, c}]
 👍
 [or, {a question | the alternatives}] if [ask, the question].
-[or, {the question | the alternatives}] if [ask, the question] .
-Memorized.
+ERROR: {"offset":5,"token":{"value":"{"}}
+ 
 [or, {a question | the alternatives}] if [or, the alternatives].
-[or, {the question | the alternatives}] if [or, the alternatives] .
-Memorized.
+ERROR: {"offset":5,"token":{"value":"{"}}
+ 
 # arithmetic
 👍
 [add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
-[add, the aaa, the bbb, the sum] if [javascript, "$1 + $2", {the aaa, the bbb}, the sum] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"a"}}
+ 
 [sub, an aaa, a bbb, the difference] if [javascript, "$1 - $2", {an aaa, a bbb}, the difference].
-[sub, the aaa, the bbb, the difference] if [javascript, "$1 - $2", {the aaa, the bbb}, the difference] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"a"}}
+ 
 [mul, an aaa, a bbb, the product] if [javascript, "$1 * $2", {an aaa, a bbb}, the product].
-[mul, the aaa, the bbb, the product] if [javascript, "$1 * $2", {the aaa, the bbb}, the product] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"a"}}
+ 
 [div, an aaa, a bbb, the quotient] if [javascript, "$1 / $2", {an aaa, a bbb}, the quotient].
-[div, the aaa, the bbb, the quotient] if [javascript, "$1 / $2", {the aaa, the bbb}, the quotient] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"a"}}
+ 
 # The canonical quicksort
 👍
 [qsort, {}, {}].
-[qsort, nothing, nothing] .
-Memorized.
+ERROR: {"offset":8,"token":{"value":"{"}}
+ 
 [qsort, {an xxx|the rest}, an aaanswer] if [partition, an xxx, the rest, {}, a bbbefore, {}, an aaafter], [qsort, a bbbefore, a bbbsort], [qsort, an aaafter, an aaasort], [append, a bbbsort, {an xxx | an aaasort}, an aaanswer].
-[qsort, {the xxx | the rest}, the aaanswer] if [partition, the xxx, the rest, nothing, the bbbefore, nothing, the aaafter], [qsort, the bbbefore, the bbbsort], [qsort, the aaafter, the aaasort], [append, the bbbsort, {the xxx | the aaasort}, the aaanswer] .
-Memorized.
+ERROR: {"offset":8,"token":{"value":"{"}}
+ 
 [partition, an xxx, {}, a bbbefore, a bbbefore, an aaafter, an aaafter].
-[partition, the xxx, nothing, the bbbefore, the bbbefore, the aaafter, the aaafter] .
-Memorized.
+ERROR: {"offset":15,"token":{"value":"x"}}
+ 
 [partition, an xxx, {a yyy | the rest}, a bbb, {a yyy | a bbbrest}, an aaa, an aaarest] if [leq, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-[partition, the xxx, {the yyy | the rest}, the bbb, {the yyy | the bbbrest}, the aaa, the aaarest] if [leq, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
-Memorized.
+ERROR: {"offset":15,"token":{"value":"x"}}
+ 
 [partition, an xxx, {a yyy | the rest}, a bbb, a bbbrest, an aaa, {a yyy | an aaarest}] if [gtr, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-[partition, the xxx, {the yyy | the rest}, the bbb, the bbbrest, the aaa, {the yyy | the aaarest}] if [gtr, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
-Memorized.
+ERROR: {"offset":15,"token":{"value":"x"}}
+ 
 [leq, an xxx, a yyy] if [compare, an xxx, a yyy, gt].
-[leq, the xxx, the yyy] if [compare, the xxx, the yyy, gt] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"x"}}
+ 
 [leq, an xxx, a yyy] if [compare, an xxx, a yyy, eq].
-[leq, the xxx, the yyy] if [compare, the xxx, the yyy, eq] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"x"}}
+ 
 [gtr, an xxx, a yyy] if [compare, an xxx, a yyy, lt].
-[gtr, the xxx, the yyy] if [compare, the xxx, the yyy, lt] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"x"}}
+ 
 # Some list-processing stuff...
 👍
 [append, {}, a zzzz, a zzzz].
-[append, nothing, the zzzz, the zzzz] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"{"}}
+ 
 [append, {an aaa|a bbb}, a zzzz, {an aaa|the differentz}] if [append, a bbb, a zzzz, the differentz].
-[append, {the aaa | the bbb}, the zzzz, {the aaa | the differentz}] if [append, the bbb, the zzzz, the differentz] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"{"}}
+ 
 [reverse, {}, {}].
-[reverse, nothing, nothing] .
-Memorized.
+ERROR: {"offset":10,"token":{"value":"{"}}
+ 
 [reverse, {an aaa|a bbb}, a zzzz] if [reverse, a bbb, a bbbrev], [append, a bbbrev, {an aaa}, a zzzz].
-[reverse, {the aaa | the bbb}, the zzzz] if [reverse, the bbb, the bbbrev], [append, the bbbrev, {the aaa}, the zzzz] .
-Memorized.
+ERROR: {"offset":10,"token":{"value":"{"}}
+ 
 [length, {}, 0].
-[length, nothing, 0] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"{"}}
+ 
 [length, {an hhhh|the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn].
-[length, {the hhhh | the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"{"}}
+ 
 # Standard prolog not/1
 👍
 [not, the tttterm] if [ask, the tttterm], commit, get_more.
-[not, the tttterm] if [ask, the tttterm], [commit], [get_more] .
-Memorized.
+ERROR: {"offset":42,"token":{"value":"c"}}
+ 
 [not, the tttterm].
-[not, the tttterm] .
+{"head":{"tuple":[{"literal":{"bareword":"not"}},{"variable":{"bareword":"tttterm"}}]},"query":[]}
 Memorized.
 # Standard prolog var/1 = unbound/1
 👍
 [unbound, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
-[unbound, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
-Memorized.
+ERROR: {"offset":13,"token":{"value":"x"}}
+ 
 [varTest, a].
-[varTest, a] .
+{"head":{"tuple":[{"literal":{"bareword":"varTest"}},{"literal":{"bareword":"a"}}]},"query":[]}
 Memorized.
 [tarTest, b].
-[tarTest, b] .
+{"head":{"tuple":[{"literal":{"bareword":"tarTest"}},{"literal":{"bareword":"b"}}]},"query":[]}
 Memorized.
 # standard once/1
 👍
 [once, a goal] if [ask, the goal], commit.
-[once, the goal] if [ask, the goal], [commit] .
-Memorized.
+ERROR: {"offset":9,"token":{"value":"g"}}
+ 
 #
 👍
 #
@@ -178,45 +170,38 @@ Memorized.
 # Enter your ruleset in here.
 👍
 [triple, sc, a, b].
-[triple, sc, a, b] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"a"}},{"literal":{"bareword":"b"}}]},"query":[]}
 Memorized.
 [triple, sc, b, c].
-[triple, sc, b, c] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"b"}},{"literal":{"bareword":"c"}}]},"query":[]}
 Memorized.
 [triple, sc, c, d].
-[triple, sc, c, d] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"c"}},{"literal":{"bareword":"d"}}]},"query":[]}
 Memorized.
 [triple, sc, d, e].
-[triple, sc, d, e] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"d"}},{"literal":{"bareword":"e"}}]},"query":[]}
 Memorized.
 [triple, sc, e, f].
-[triple, sc, e, f] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"e"}},{"literal":{"bareword":"f"}}]},"query":[]}
 Memorized.
 [triple, sc, f, g].
-[triple, sc, f, g] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"f"}},{"literal":{"bareword":"g"}}]},"query":[]}
 Memorized.
 [triple, type, sc, transitive].
-[triple, type, sc, transitive] .
+{"head":{"tuple":[{"literal":{"bareword":"triple"}},{"literal":{"bareword":"type"}},{"literal":{"bareword":"sc"}},{"literal":{"bareword":"transitive"}}]},"query":[]}
 Memorized.
 [triple, the ppl, an xxx, a yyy] if dontSelfRecurse:[triple, type, the ppl, transitive], dontSelfRecurse:[triple, the ppl, an xxx, a zzzz], [triple, the ppl, a zzzz, a yyy].
-[triple, the ppl, the xxx, the yyy] if [triple, type, the ppl, transitive], [triple, the ppl, the xxx, the zzzz], [triple, the ppl, the zzzz, the yyy] .
-Memorized.
+ERROR: {"offset":21,"token":{"value":"x"}}
+ 
 [arcsOut, an xxx, the lost] if [bagof, the oolong, [triple, the ppl, an xxx, the oolong], the lost].
-[arcsOut, the xxx, the lost] if [bagof, the oolong, [triple, the ppl, the xxx, the oolong], the lost] .
-Memorized.
+ERROR: {"offset":13,"token":{"value":"x"}}
+ 
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]? # L should have 21 elements
-[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
-The aaa is anything.
-The bbb is anything.
-The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
-The nnn is 21.
+ERROR: {"offset":27,"token":{"value":"a"}}
+ 
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
-[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
-The aaa is anything.
-The bbb is anything.
-The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
-The nnn is 21.
+ERROR: {"offset":27,"token":{"value":"a"}}
+ 
 [bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
-expected complex question to end with ? but instead got
-.
+ERROR: {"offset":27,"token":{"value":"a"}}
  

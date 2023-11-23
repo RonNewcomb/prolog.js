@@ -1,11 +1,7 @@
-import { printAnswerline, printEcholine, registerProcessLine } from "./ui";
+import { consoleOutError, printAnswerline, printEcholine, registerProcessLine } from "./ui";
 import { Parser, Grammar } from "nearley";
-//const nearley = require("nearley");
-//const grammar = require("./grammar.js");
 import "../../src2/projama.js";
 
-// const Parser = nearley.Parser;
-// const Grammar = nearley.Grammar;
 const grammar = (window as any).grammar;
 
 interface Literal {
@@ -204,7 +200,7 @@ function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | un
 
 export function processLine(rule: Rule): void {
   let result = false;
-  if (rule.head.tuple[0].literal?.bareword != "more") {
+  if (rule.head?.tuple?.[0].literal?.bareword != "more") {
     if (rule == null) return;
     printEcholine(JSON.stringify(rule));
     if (rule.head) {
@@ -212,25 +208,31 @@ export function processLine(rule: Rule): void {
       printAnswerline("Memorized.\n");
       return;
     }
+    //console.log("QUERY", JSON.stringify(rule.query));
     result = ask(database, rule.query);
   } else result = ask(database);
-  printAnswerline(!result ? "No." : JSON.stringify(previousRun.vars));
+  printAnswerline(!result ? "No." : previousRun.vars ? JSON.stringify(previousRun.vars) : "Yes.");
 }
 
-// Create a Parser object from our grammar.
-const parser = new Parser(Grammar.fromCompiled(grammar));
-
-// test
-// parser.feed("[drive].");
-// console.log(JSON.stringify(parser.results));
+interface ErrorShape {
+  offset: number;
+  token: { value: string };
+}
 
 registerProcessLine(line => {
-  const { results } = parser.feed(line);
-  const inputfile: InputFile = results[0];
-  console.log(inputfile.lines);
-  const rule = inputfile.lines[0];
-  console.log(rule);
-  return processLine(rule);
+  try {
+    const parser = new Parser(Grammar.fromCompiled(grammar));
+    const { results } = parser.feed(line);
+    const interpretations: InputFile[] = results;
+    console.warn(interpretations);
+    const inputfile: InputFile = interpretations[interpretations.length - 1];
+    //console.log(inputfile.lines);
+    const rule = inputfile.lines.pop();
+    console.log(rule);
+    return processLine(rule!);
+  } catch (e: any) {
+    consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));
+  }
 });
 
 // `tsc && rollup -c`

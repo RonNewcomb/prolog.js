@@ -37,11 +37,11 @@ export function printAnswerline(str: string) {
   newConsoleLine("answerdiv", "<div><div>" + str.replaceAll("\n", "</div><div>") + "</div></div>");
 }
 
-// export function consoleOutError(tk: Tokeniser | null, ...rest: any[]): null {
-//   newConsoleLine("errdiv", "<div><div><span class=err>" + rest.join(" ") + "</span></div><div>" + (tk ? tk.current + tk.remainder : "") + "</div></div>");
-//   newConsoleLine();
-//   return null;
-// }
+export function consoleOutError(str: string): null {
+  newConsoleLine("errdiv", "<div><div><span class=err>" + str.replaceAll("\n", "</div><div>") + "</span></div></div>");
+  newConsoleLine();
+  return null;
+}
 
 const previousInput: string[] = [];
 let previousInputIndex = 0;
