@@ -27,8 +27,8 @@ Memorized.
 [holds, "bucket", the capacity, yes]?
 The capacity is 834.
 more
-The capacity is 834.
+The capacity is 7.
 more
-The capacity is 834.
+No.
 more
-The capacity is 834.
+No.

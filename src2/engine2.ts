@@ -106,8 +106,13 @@ export function ask(database: Database, querysToProve?: Tuple[]): boolean {
   return goer(previousRun) === Direction.Succeeded;
 }
 
+export function failThatAnswer(current: GraphNode): void {
+  if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
+  else current.vars = undefined;
+}
+
 function goer(current: GraphNode): Direction {
-  // on a backtrack, start over
+  // on a backtrack, start over // javascript's weird way of doing a GOTO
   on_backtracking: do {
     // find a rule in database that unifies with current .queryToProve (unification sets .vars)
     if (!current.vars) {
@@ -148,9 +153,9 @@ function goer(current: GraphNode): Direction {
 
       // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
       current.vars = undefined;
-      continue on_backtracking;
+      continue on_backtracking; // javascript's weird way of doing a GOTO
     }
-  } while (false);
+  } while (false); // javascript's weird way of doing a GOTO
 
   return Direction.Succeeded; // all children succeeded, so, I do too.
 }
@@ -223,7 +228,8 @@ registerProcessLine(line => {
       database.forEach(rule => printAnswerline(JSON.stringify(rule)));
       return;
     }
-    if (line != "more") {
+    if (line == "more") failThatAnswer(previousRun);
+    else {
       const parser = new Parser(Grammar.fromCompiled(grammar));
       const { results } = parser.feed(line);
       const interpretations: InputFile[] = results;
