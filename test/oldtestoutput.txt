@@ -1,0 +1,222 @@
+ Show parse results
+Fetching test/testinput.txt
+# testing basics
+👍
+[holds, "bucket", 834, yes].
+[holds, "bucket", 834, yes] .
+Memorized.
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[holds, "bucket", the capacity, yes]?
+[holds, "bucket", the capacity, yes] ?
+The capacity is 834.
+#[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
+👍
+[holds, "bucket", ?, yes]
+[holds, "bucket", the ?, yes] ?
+834.
+[holds, "box", 411, no].
+[holds, "box", 411, no] .
+Memorized.
+[holds, "envelope", 1, yes].
+[holds, "envelope", 1, yes] .
+Memorized.
+[holds, a container, a capacity, any whether]?
+[holds, the container, the capacity, the whether] ?
+The container is "bucket".
+The capacity is 834.
+The whether is yes.
+The container is "box".
+The capacity is 411.
+The whether is no.
+The container is "envelope".
+The capacity is 1.
+The whether is yes.
+# testing NOT
+👍
+[holds, "bucket", 834, yes]?
+[holds, "bucket", 834, yes] ?
+Yes.
+[not, [holds, "bucket", 834, yes]]?
+[not, [holds, "bucket", 834, yes]] ?
+No.
+[holds, "bucket", 76, yes]?
+[holds, "bucket", 76, yes] ?
+No.
+[not, [holds, "bucket", 76, yes]]?
+[not, [holds, "bucket", 76, yes]] ?
+No.
+# testing First item not special
+👍
+[Bob, dreams, big]
+[Bob, dreams, big] .
+Memorized.
+[?, dreams, big]
+[the ?, dreams, big] ?
+Bob.
+[Bob, ? , big]
+[Bob, the ?, big] ?
+dreams.
+[Bob, dreams, ?]
+[Bob, dreams, the ?] ?
+big.
+### Accumulated standard library lives under here!
+👍
+# unification and [ x, y, z; w ] support
+👍
+[unify, an xxx, an xxx].
+[unify, the xxx, the xxx] .
+Memorized.
+# [ a, b, c ] --> [and, {a, b, c}]
+👍
+[and, {}].
+[and, nothing] .
+Memorized.
+[and, {a question | the rest}] if [ask, the question], [and, the rest].
+[and, {the question | the rest}] if [ask, the question], [and, the rest] .
+Memorized.
+# [ a; b; c ] --> [or, {a, b, c}]
+👍
+[or, {a question | the alternatives}] if [ask, the question].
+[or, {the question | the alternatives}] if [ask, the question] .
+Memorized.
+[or, {a question | the alternatives}] if [or, the alternatives].
+[or, {the question | the alternatives}] if [or, the alternatives] .
+Memorized.
+# arithmetic
+👍
+[add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum]. # an aaa + a bbb = the ccc, etc.
+[add, the aaa, the bbb, the sum] if [javascript, "$1 + $2", {the aaa, the bbb}, the sum] .
+Memorized.
+[sub, an aaa, a bbb, the difference] if [javascript, "$1 - $2", {an aaa, a bbb}, the difference].
+[sub, the aaa, the bbb, the difference] if [javascript, "$1 - $2", {the aaa, the bbb}, the difference] .
+Memorized.
+[mul, an aaa, a bbb, the product] if [javascript, "$1 * $2", {an aaa, a bbb}, the product].
+[mul, the aaa, the bbb, the product] if [javascript, "$1 * $2", {the aaa, the bbb}, the product] .
+Memorized.
+[div, an aaa, a bbb, the quotient] if [javascript, "$1 / $2", {an aaa, a bbb}, the quotient].
+[div, the aaa, the bbb, the quotient] if [javascript, "$1 / $2", {the aaa, the bbb}, the quotient] .
+Memorized.
+# The canonical quicksort
+👍
+[qsort, {}, {}].
+[qsort, nothing, nothing] .
+Memorized.
+[qsort, {an xxx|the rest}, an aaanswer] if [partition, an xxx, the rest, {}, a bbbefore, {}, an aaafter], [qsort, a bbbefore, a bbbsort], [qsort, an aaafter, an aaasort], [append, a bbbsort, {an xxx | an aaasort}, an aaanswer].
+[qsort, {the xxx | the rest}, the aaanswer] if [partition, the xxx, the rest, nothing, the bbbefore, nothing, the aaafter], [qsort, the bbbefore, the bbbsort], [qsort, the aaafter, the aaasort], [append, the bbbsort, {the xxx | the aaasort}, the aaanswer] .
+Memorized.
+[partition, an xxx, {}, a bbbefore, a bbbefore, an aaafter, an aaafter].
+[partition, the xxx, nothing, the bbbefore, the bbbefore, the aaafter, the aaafter] .
+Memorized.
+[partition, an xxx, {a yyy | the rest}, a bbb, {a yyy | a bbbrest}, an aaa, an aaarest] if [leq, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
+[partition, the xxx, {the yyy | the rest}, the bbb, {the yyy | the bbbrest}, the aaa, the aaarest] if [leq, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
+Memorized.
+[partition, an xxx, {a yyy | the rest}, a bbb, a bbbrest, an aaa, {a yyy | an aaarest}] if [gtr, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
+[partition, the xxx, {the yyy | the rest}, the bbb, the bbbrest, the aaa, {the yyy | the aaarest}] if [gtr, the xxx, the yyy], [partition, the xxx, the rest, the bbb, the bbbrest, the aaa, the aaarest] .
+Memorized.
+[leq, an xxx, a yyy] if [compare, an xxx, a yyy, gt].
+[leq, the xxx, the yyy] if [compare, the xxx, the yyy, gt] .
+Memorized.
+[leq, an xxx, a yyy] if [compare, an xxx, a yyy, eq].
+[leq, the xxx, the yyy] if [compare, the xxx, the yyy, eq] .
+Memorized.
+[gtr, an xxx, a yyy] if [compare, an xxx, a yyy, lt].
+[gtr, the xxx, the yyy] if [compare, the xxx, the yyy, lt] .
+Memorized.
+# Some list-processing stuff...
+👍
+[append, {}, a zzzz, a zzzz].
+[append, nothing, the zzzz, the zzzz] .
+Memorized.
+[append, {an aaa|a bbb}, a zzzz, {an aaa|the differentz}] if [append, a bbb, a zzzz, the differentz].
+[append, {the aaa | the bbb}, the zzzz, {the aaa | the differentz}] if [append, the bbb, the zzzz, the differentz] .
+Memorized.
+[reverse, {}, {}].
+[reverse, nothing, nothing] .
+Memorized.
+[reverse, {an aaa|a bbb}, a zzzz] if [reverse, a bbb, a bbbrev], [append, a bbbrev, {an aaa}, a zzzz].
+[reverse, {the aaa | the bbb}, the zzzz] if [reverse, the bbb, the bbbrev], [append, the bbbrev, {the aaa}, the zzzz] .
+Memorized.
+[length, {}, 0].
+[length, nothing, 0] .
+Memorized.
+[length, {an hhhh|the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn].
+[length, {the hhhh | the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn] .
+Memorized.
+# Standard prolog not/1
+👍
+[not, the tttterm] if [ask, the tttterm], commit, get_more.
+[not, the tttterm] if [ask, the tttterm], [commit], [get_more] .
+Memorized.
+[not, the tttterm].
+[not, the tttterm] .
+Memorized.
+# Standard prolog var/1 = unbound/1
+👍
+[unbound, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
+[unbound, the xxx] if [bagof, l, [varTest, the xxx], {l, l}] .
+Memorized.
+[varTest, a].
+[varTest, a] .
+Memorized.
+[tarTest, b].
+[tarTest, b] .
+Memorized.
+# standard once/1
+👍
+[once, a goal] if [ask, the goal], commit.
+[once, the goal] if [ask, the goal], [commit] .
+Memorized.
+#
+👍
+#
+👍
+# Enter your ruleset in here.
+👍
+[triple, sc, a, b].
+[triple, sc, a, b] .
+Memorized.
+[triple, sc, b, c].
+[triple, sc, b, c] .
+Memorized.
+[triple, sc, c, d].
+[triple, sc, c, d] .
+Memorized.
+[triple, sc, d, e].
+[triple, sc, d, e] .
+Memorized.
+[triple, sc, e, f].
+[triple, sc, e, f] .
+Memorized.
+[triple, sc, f, g].
+[triple, sc, f, g] .
+Memorized.
+[triple, type, sc, transitive].
+[triple, type, sc, transitive] .
+Memorized.
+[triple, the ppl, an xxx, a yyy] if dontSelfRecurse:[triple, type, the ppl, transitive], dontSelfRecurse:[triple, the ppl, an xxx, a zzzz], [triple, the ppl, a zzzz, a yyy].
+[triple, the ppl, the xxx, the yyy] if [triple, type, the ppl, transitive], [triple, the ppl, the xxx, the zzzz], [triple, the ppl, the zzzz, the yyy] .
+Memorized.
+[arcsOut, an xxx, the lost] if [bagof, the oolong, [triple, the ppl, an xxx, the oolong], the lost].
+[arcsOut, the xxx, the lost] if [bagof, the oolong, [triple, the ppl, the xxx, the oolong], the lost] .
+Memorized.
+[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]? # L should have 21 elements
+[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
+The aaa is anything.
+The bbb is anything.
+The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
+The nnn is 21.
+[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
+[bagof, c, [triple, sc, the aaa, the bbb], the lost], [length, the lost, the nnn] ?
+The aaa is anything.
+The bbb is anything.
+The lost is {c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c, c}.
+The nnn is 21.
+[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
+expected complex question to end with ? but instead got
+.
+ 

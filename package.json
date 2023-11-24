@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "parser": "cd src2 && nearleyc projama.ne -o ../tmp/projama.js",
+    "parser": "cd src && nearleyc projama.ne -o ../tmp/projama.js",
     "build": "tsc && rollup -c"
   },
   "dependencies": {

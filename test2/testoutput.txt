@@ -1,5 +1,5 @@
  Show parse results
-Fetching test2/testinput.txt
+Fetching test/testinput.txt
 # testing basics
 👍
 [holds, "bucket", 834, yes].

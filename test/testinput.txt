@@ -5,95 +5,12 @@
 [holds, "bucket", 76, yes]?
 [holds, "bucket", the capacity, yes]?
 #[holds, "bucket", the capacity, yes] # statement with a permanent Capacity
-[holds, "bucket", ?, yes]
+#[holds, "bucket", ?, yes] #unimplemented
 [holds, "box", 411, no].
 [holds, "envelope", 1, yes].
-[holds, a container, a capacity, any whether]?
-
-# testing NOT
-[holds, "bucket", 834, yes]?
-[not, [holds, "bucket", 834, yes]]?
-[holds, "bucket", 76, yes]?
-[not, [holds, "bucket", 76, yes]]?
-
-# testing First item not special
-[Bob, dreams, big]
-[?, dreams, big]
-[Bob, ? , big]
-[Bob, dreams, ?]
-
-
-### Accumulated standard library lives under here!
-
-# unification and [ x, y, z; w ] support
-
-[unify, an xxx, an xxx].
-
-# [ a, b, c ] --> [and, {a, b, c}]
-[and, {}].
-[and, {a question | the rest}] if [ask, the question], [and, the rest].
-
-# [ a; b; c ] --> [or, {a, b, c}]
-[or, {a question | the alternatives}] if [ask, the question].
-[or, {a question | the alternatives}] if [or, the alternatives].
-
-# arithmetic
-[add, an aaa, a bbb, the sum] if [javascript, "$1 + $2", {an aaa, a bbb}, the sum].   # an aaa + a bbb = the ccc, etc.
-[sub, an aaa, a bbb, the difference] if [javascript, "$1 - $2", {an aaa, a bbb}, the difference].
-[mul, an aaa, a bbb, the product] if [javascript, "$1 * $2", {an aaa, a bbb}, the product].
-[div, an aaa, a bbb, the quotient] if [javascript, "$1 / $2", {an aaa, a bbb}, the quotient].
-
-# The canonical quicksort
-[qsort, {}, {}].
-[qsort, {an xxx|the rest}, an aaanswer] if [partition, an xxx, the rest, {}, a bbbefore, {}, an aaafter], [qsort, a bbbefore, a bbbsort], [qsort, an aaafter, an aaasort], [append, a bbbsort, {an xxx | an aaasort}, an aaanswer].
-[partition, an xxx, {}, a bbbefore, a bbbefore, an aaafter, an aaafter].
-[partition, an xxx, {a yyy | the rest}, a bbb, {a yyy | a bbbrest}, an aaa, an aaarest] if [leq, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-[partition, an xxx, {a yyy | the rest}, a bbb, a bbbrest, an aaa, {a yyy | an aaarest}] if [gtr, an xxx, a yyy], [partition, an xxx, the rest, a bbb, a bbbrest, an aaa, an aaarest].
-
-[leq, an xxx, a yyy] if [compare, an xxx, a yyy, gt].
-[leq, an xxx, a yyy] if [compare, an xxx, a yyy, eq].
-[gtr, an xxx, a yyy] if [compare, an xxx, a yyy, lt].
-
-# Some list-processing stuff...
-[append, {}, a zzzz, a zzzz].
-[append, {an aaa|a bbb}, a zzzz, {an aaa|the differentz}] if [append, a bbb, a zzzz, the differentz].
-
-[reverse, {}, {}].
-[reverse, {an aaa|a bbb}, a zzzz] if [reverse, a bbb, a bbbrev], [append, a bbbrev, {an aaa}, a zzzz].
-
-[length, {}, 0].
-[length, {an hhhh|the tttt}, the nnn] if [length, the tttt, the mmm], [add, the mmm, 1, the nnn].
-
-# Standard prolog not/1
-[not, the tttterm] if [ask, the tttterm], commit, get_more.
-[not, the tttterm].
-
-# Standard prolog var/1 = unbound/1
-[unbound, an xxx] if [bagof, l, [varTest, an xxx], {l, l}].
-[varTest, a].
-[tarTest, b].
-
-# standard once/1 
-[once, a goal] if [ask, the goal], commit.
-
-
-#
-# 
-# Enter your ruleset in here.
-[triple, sc, a, b].
-[triple, sc, b, c].
-[triple, sc, c, d].
-[triple, sc, d, e].
-[triple, sc, e, f].
-[triple, sc, f, g].
-[triple, type, sc, transitive].
-
-[triple, the ppl, an xxx, a yyy] if dontSelfRecurse:[triple, type, the ppl, transitive], dontSelfRecurse:[triple, the ppl, an xxx, a zzzz], [triple, the ppl, a zzzz, a yyy].
-
-[arcsOut, an xxx, the lost] if [bagof, the oolong, [triple, the ppl, an xxx, the oolong], the lost].
-
-[bagof, c, [triple, sc, an aaa, a bbb], the lost],   [length, the lost, the nnn]?           # L should have 21 elements
-
-[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn]
-
-[bagof, c, [triple, sc, an aaa, a bbb], the lost], [length, the lost, the nnn].
+[holds, the container, the capacity, the whether]?
+[holds, "bucket", 7, yes].
+[holds, "bucket", the capacity, yes]?
+more
+more
+more
