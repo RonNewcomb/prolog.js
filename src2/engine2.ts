@@ -1,10 +1,10 @@
-import { consoleOutError, printAnswerline, printEcholine, registerProcessLine } from "./ui";
+import { clear, consoleOutError, printAnswerline, printEcholine, onNextLine } from "./ui";
 import { Parser, Grammar } from "nearley";
-import "../../src2/projama.js"; // found from /tmp/src2/engine2.js
+import "../../tmp/projama.js"; // found from /tmp/src2/engine2.js
 
 const grammar = (window as any).grammar; // created by iife in projama.js
 
-interface Literal {
+export interface Literal {
   literal: {
     rvalue: string | number | boolean;
     rtype: "bareword" | "string" | "number" | "boolean";
@@ -13,24 +13,24 @@ interface Literal {
   variable?: never; // for typechecking
   tuple?: never; // for typechecking
 }
-interface Variable {
+export interface Variable {
   variable: {
     bareword: string;
   };
   literal?: never; // for typechecking
   tuple?: never; // for typechecking
 }
-type TupleItem = Literal | Variable | Tuple;
-interface Tuple {
+export type TupleItem = Literal | Variable | Tuple;
+export interface Tuple {
   tuple: TupleItem[];
   variable?: never; // for typechecking
   literal?: never; // for typechecking
 }
-interface Rule {
+export interface Rule {
   head?: Tuple;
   query?: Tuple[];
 }
-interface InputFile {
+export interface InputFile {
   lines: Rule[];
 }
 
@@ -59,15 +59,16 @@ const sample2: InputFile = {
   ],
 };
 
-type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
-type Database = Rule[];
+export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
+export type Database = Rule[];
 
-const database: Database = [];
+export let database: Database = [];
+export const useDatabase = (db: Database) => (database = db);
 
 console.info("enter listing() to show the database");
 (window as any).listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
 
-interface GraphNode {
+export interface GraphNode {
   //parent?: GraphNode;
   queryToProve: Tuple;
   database: Database;
@@ -79,7 +80,7 @@ interface GraphNode {
   querysToProve?: GraphNode[];
 }
 
-const enum Direction {
+export const enum Direction {
   Failing, // backtracking
   Succeeded,
 }
@@ -90,6 +91,18 @@ for every goal,
   for each of the rule body's subgoals, <recurse>
   if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
 */
+
+export function prolog(database: Database, rule: Rule): boolean | void {
+  if (rule.head) return tell(database, rule);
+  const result = ask(database, rule.query);
+  printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
+  return result;
+}
+
+export function tell(database: Database, rule: Rule) {
+  database.push(rule);
+  printAnswerline("Memorized.\n");
+}
 
 let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
@@ -221,13 +234,11 @@ interface ErrorShape {
   token: { value: string };
 }
 
-registerProcessLine(line => {
+onNextLine(line => {
   try {
-    let query: Tuple[] | undefined = undefined;
-    if (line == "listing") {
-      database.forEach(rule => printAnswerline(JSON.stringify(rule)));
-      return;
-    }
+    let query: Rule["query"];
+    if (line == "listing") return database.forEach(rule => printAnswerline(JSON.stringify(rule)));
+    if (line == "clear") return clear();
     if (line == "more") failThatAnswer(previousRun);
     else {
       const parser = new Parser(Grammar.fromCompiled(grammar));
@@ -240,11 +251,7 @@ registerProcessLine(line => {
       //console.log(JSON.stringify(rule));
       if (!rule) return;
       printEcholine(JSON.stringify(rule));
-      if (rule.head) {
-        database.push(rule);
-        printAnswerline("Memorized.\n");
-        return;
-      }
+      if (rule.head) return tell(database, rule);
       query = rule.query;
     }
     const result = ask(database, query);
@@ -255,10 +262,10 @@ registerProcessLine(line => {
   }
 });
 
-function prettyPrintVarBindings(scope: Scope): string {
+export function prettyPrintVarBindings(scope: Scope): string {
   const vars = [];
   for (let v in scope) vars.push(v);
-  console.log(JSON.stringify(vars));
+  // console.log(JSON.stringify(vars));
   if (vars.length == 0) return "Yes";
   return vars
     .map(varName => {
@@ -269,5 +276,3 @@ function prettyPrintVarBindings(scope: Scope): string {
     })
     .join("\n");
 }
-
-// `tsc && rollup -c`

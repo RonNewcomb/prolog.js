@@ -2,7 +2,7 @@
 
 _Prolog in sweatpants_
 
-`tsc && rollup -c`
+`npm run build` or `npm run parser`
 
 There's a maxim in software development: once you know one language, you know them all. It's not hard to see why. Variables, loops, "if" statements, we see the same constructs in different clothes everywhere. But there's one language that really is quite different from the others, and that's Prolog.
 

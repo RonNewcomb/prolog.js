@@ -73,18 +73,15 @@ export async function importSource(filename: string) {
   printAnswerline("Fetching " + filename);
   const text = await fetch(filename).then(response => response.text());
   text.split("\n").forEach(nextline);
+  commandLineEl.scrollIntoView();
 }
 
 const emojiThumbsUp = "&#x1F44D;";
 
 let processLine: (string: string) => any = () => [];
+export const onNextLine = (fn: typeof processLine) => (processLine = fn);
 
-export const registerProcessLine = (fn: typeof processLine) => {
-  processLine = fn;
-  importSource("test2/testinput.txt").then(_ => commandLineEl.scrollIntoView());
-};
-
-function nextline(line: string) {
+export function nextline(line: string) {
   line = (line || "").trim();
   if (!line) return;
   printUserline(line);
@@ -93,3 +90,5 @@ function nextline(line: string) {
   const db = processLine(line);
   commandLineEl.focus();
 }
+
+export const clear = () => (consoleOutEl.innerHTML = "");
