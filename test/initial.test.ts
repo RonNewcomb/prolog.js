@@ -1,11 +1,11 @@
-import { Database, Rule, ask, database, tell, useDatabase } from "../src/engine";
+import { Rule, prolog, database, useDatabase } from "../src/engine";
 import { clear, importSource, nextline } from "../src/ui";
-import { test } from "../src/test";
+import { test, between } from "../src/test";
+
+between(() => useDatabase([]));
 
 test(
   () => {
-    const database: Database = [];
-    useDatabase(database);
     const rule: Rule = {
       head: {
         tuple: [
@@ -24,21 +24,17 @@ test(
         ],
       },
     };
-    tell(database, rule);
+    prolog(database, rule);
     const contents = database[0];
     if (contents != rule) throw "tell didn't insert rule but instead " + JSON.stringify(database);
   },
 
   () => {
-    const database: Database = [];
-    useDatabase(database);
     nextline(`[holds, "bucket", 834, yes].`);
     if (database.length !== 1) throw "nextline didn't insert rule";
   },
 
   () => {
-    const database: Database = [];
-    useDatabase(database);
     nextline(`[holds, "bucket", 834, yes].`);
     nextline(`[holds, "bucket", 78, yes].`);
     nextline(`[holds, "bucket", 834, yes]?`);
@@ -46,8 +42,6 @@ test(
   },
 
   () => {
-    const database: Database = [];
-    useDatabase(database);
     nextline(`[holds, "bucket", 834, yes].`);
     nextline(`[holds, "bucket", 78, yes].`);
     const rule: Rule = {
@@ -71,14 +65,12 @@ test(
         },
       ],
     };
-    const success = ask(database, rule.query);
+    const success = prolog(database, rule);
     if (database.length !== 2) throw "nextline didn't insert";
     if (!success) throw `[holds, "bucket", 834, yes]? didn't succeed`;
   },
 
   () => {
-    const database: Database = [];
-    useDatabase(database);
     nextline(`[holds, "bucket", 834, yes].`);
     const rule: Rule = {
       head: undefined,
@@ -101,23 +93,17 @@ test(
         },
       ],
     };
-    const success = ask(database, rule.query);
+    const success = prolog(database, rule);
     if (database.length !== 1) throw "nextline didn't insert";
     if (success) throw `[holds, "bucket", 78, yes]? didn't fail`;
   },
 
   async () => {
     clear();
-    useDatabase([]);
     await importSource("test/testinput.txt"); // don't forget to return or await the promise
   },
 
   () => {
-    if (database.length != 4) throw "Database was cleaned or i wasnt waiting";
-  },
-
-  () => {
-    useDatabase([]);
-    if (database.length != 0) throw "or i wasnt waiting";
+    if (database.length != 0) throw "dirty database";
   }
 );

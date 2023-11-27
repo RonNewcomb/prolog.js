@@ -40,18 +40,10 @@ const sample2: InputFile = {
       query: [
         {
           tuple: [
-            {
-              literal: {
-                rtype: "bareword",
-                rvalue: "holds",
-                bareword: "holds",
-              },
-            },
+            { literal: { rtype: "bareword", rvalue: "holds", bareword: "holds" } },
             { literal: { rtype: "string", rvalue: "bucket" } },
             { literal: { rtype: "number", rvalue: "834" } },
-            {
-              literal: { rtype: "bareword", rvalue: "yes", bareword: "yes" },
-            },
+            { literal: { rtype: "bareword", rvalue: "yes", bareword: "yes" } },
           ],
         },
       ],
@@ -85,28 +77,13 @@ export const enum Direction {
   Succeeded,
 }
 
-/*
-for every goal, 
-  find [the next] rule in the database which unifies with its head 
-  for each of the rule body's subgoals, <recurse>
-  if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
-*/
-
-export function prolog(database: Database, rule: Rule): boolean | void {
-  if (rule.head) return tell(database, rule);
-  const result = ask(database, rule.query);
-  printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
-  return result;
-}
-
-export function tell(database: Database, rule: Rule) {
-  database.push(rule);
-  printAnswerline("Memorized.\n");
-}
-
-let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
-
-export function ask(database: Database, querysToProve?: Tuple[]): boolean {
+export function prolog(database: Database, rule: Rule | undefined): boolean | void {
+  if (rule?.head) {
+    database.push(rule);
+    printAnswerline("Memorized.\n");
+    return;
+  }
+  const querysToProve: Tuple[] | undefined = rule?.query;
   previousRun = querysToProve
     ? <GraphNode>{
         queryToProve: querysToProve[0],
@@ -116,14 +93,24 @@ export function ask(database: Database, querysToProve?: Tuple[]): boolean {
         // querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
       }
     : previousRun;
-  return goer(previousRun) === Direction.Succeeded;
+  const result = goer(previousRun) === Direction.Succeeded;
+  printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
+  return result;
 }
+
+let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
 export function failThatAnswer(current: GraphNode): void {
   if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
   else current.vars = undefined;
 }
 
+/*
+for every goal, 
+  find [the next] rule in the database which unifies with its head 
+  for each of the rule body's subgoals, <recurse>
+  if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
+*/
 function goer(current: GraphNode): Direction {
   // on a backtrack, start over // javascript's weird way of doing a GOTO
   on_backtracking: do {
@@ -236,7 +223,7 @@ interface ErrorShape {
 
 onNextLine(line => {
   try {
-    let query: Rule["query"];
+    let rule: Rule | undefined;
     if (line == "listing") return database.forEach(rule => printAnswerline(JSON.stringify(rule)));
     if (line == "clear") return clear();
     if (line == "more") failThatAnswer(previousRun);
@@ -247,15 +234,12 @@ onNextLine(line => {
       if (interpretations.length) console.warn("WARNING: multiple interpretations");
       const inputfile: InputFile = interpretations[interpretations.length - 1];
       //console.log(inputfile.lines);
-      const rule = inputfile.lines.pop();
+      rule = inputfile.lines.pop();
       //console.log(JSON.stringify(rule));
       if (!rule) return;
       printEcholine(JSON.stringify(rule));
-      if (rule.head) return tell(database, rule);
-      query = rule.query;
     }
-    const result = ask(database, query);
-    printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
+    const result = prolog(database, rule);
     //console.log(previousRun);
   } catch (e: any) {
     consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));
