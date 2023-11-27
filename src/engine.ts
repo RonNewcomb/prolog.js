@@ -51,16 +51,10 @@ const sample2: InputFile = {
   ],
 };
 
-export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
+type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
 export type Database = Rule[];
 
-export let database: Database = [];
-export const useDatabase = (db: Database) => (database = db);
-
-console.info("enter listing() to show the database");
-(window as any).listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
-
-export interface GraphNode {
+interface GraphNode {
   //parent?: GraphNode;
   queryToProve: Tuple;
   database: Database;
@@ -72,10 +66,14 @@ export interface GraphNode {
   querysToProve?: GraphNode[];
 }
 
-export const enum Direction {
+const enum Direction {
   Failing, // backtracking
   Succeeded,
 }
+
+export let database: Database = [];
+export const useDatabase = (db: Database) => (database = db);
+let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
 export function prolog(database: Database, rule: Rule | undefined): boolean | void {
   if (rule?.head) {
@@ -83,27 +81,21 @@ export function prolog(database: Database, rule: Rule | undefined): boolean | vo
     printAnswerline("Memorized.\n");
     return;
   }
-  const querysToProve: Tuple[] | undefined = rule?.query;
-  previousRun = querysToProve
-    ? <GraphNode>{
-        queryToProve: querysToProve[0],
-        database,
-        dbIndex: -1,
-        // vars: {},
-        // querysToProve: querysToProve.map(query => ({ queryToProve: query, database, dbIndex: -1 })),
-      }
-    : previousRun;
+  previousRun = rule?.query ? <GraphNode>{ queryToProve: rule?.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun) === Direction.Succeeded;
   printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
   return result;
 }
 
-let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
-
 export function failThatAnswer(current: GraphNode): void {
   if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
   else current.vars = undefined;
 }
+
+export const listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
+
+console.info("enter listing() to show the database");
+(window as any).listing = listing;
 
 /*
 for every goal, 
@@ -223,7 +215,7 @@ interface ErrorShape {
 
 onNextLine(line => {
   try {
-    let rule: Rule | undefined;
+    let rule: Rule | undefined = undefined;
     if (line == "listing") return database.forEach(rule => printAnswerline(JSON.stringify(rule)));
     if (line == "clear") return clear();
     if (line == "more") failThatAnswer(previousRun);
