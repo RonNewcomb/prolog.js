@@ -2,7 +2,7 @@ import { clear, consoleOutError, printAnswerline, printEcholine, onNextLine } fr
 import { Parser, Grammar } from "nearley";
 import "../../tmp/projama.js"; // found from /tmp/src2/engine2.js
 
-const grammar = (window as any).grammar; // created by iife in projama.js
+const grammar = Grammar.fromCompiled((window as any).grammar); // created by iife in projama.js
 
 export interface Literal {
   literal: {
@@ -75,16 +75,14 @@ export let database: Database = [];
 export const useDatabase = (db: Database) => (database = db);
 let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
-export function prolog(database: Database, rule: Rule | undefined): boolean | void {
+export function prolog(database: Database, rule: Rule | undefined): "memorized" | "yes" | "no" | Scope {
   if (rule?.head) {
     database.push(rule);
-    printAnswerline("Memorized.\n");
-    return;
+    return "memorized";
   }
   previousRun = rule?.query ? <GraphNode>{ queryToProve: rule?.query[0], database, dbIndex: -1 } : previousRun;
-  const result = goer(previousRun) === Direction.Succeeded;
-  printAnswerline(!result ? "No." : previousRun.vars ? prettyPrintVarBindings(previousRun.vars) : "Yes.");
-  return result;
+  const result = goer(previousRun);
+  return result == Direction.Failing ? "no" : previousRun.vars ? previousRun.vars : "yes";
 }
 
 export function failThatAnswer(current: GraphNode): void {
@@ -220,10 +218,9 @@ onNextLine(line => {
     if (line == "clear") return clear();
     if (line == "more") failThatAnswer(previousRun);
     else {
-      const parser = new Parser(Grammar.fromCompiled(grammar));
-      const { results } = parser.feed(line);
+      const { results } = new Parser(grammar).feed(line);
       const interpretations: InputFile[] = results;
-      if (interpretations.length) console.warn("WARNING: multiple interpretations");
+      if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
       const inputfile: InputFile = interpretations[interpretations.length - 1];
       //console.log(inputfile.lines);
       rule = inputfile.lines.pop();
@@ -232,6 +229,7 @@ onNextLine(line => {
       printEcholine(JSON.stringify(rule));
     }
     const result = prolog(database, rule);
+    printAnswerline(typeof result === "string" ? result[0].toUpperCase() + result.slice(1) + "." : prettyPrintVarBindings(result));
     //console.log(previousRun);
   } catch (e: any) {
     consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));

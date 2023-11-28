@@ -65,7 +65,7 @@ test(
         },
       ],
     };
-    const success = prolog(database, rule);
+    const success = prolog(database, rule) != "no";
     if (database.length !== 2) throw "nextline didn't insert";
     if (!success) throw `[holds, "bucket", 834, yes]? didn't succeed`;
   },
@@ -93,7 +93,7 @@ test(
         },
       ],
     };
-    const success = prolog(database, rule);
+    const success = prolog(database, rule) != "no";
     if (database.length !== 1) throw "nextline didn't insert";
     if (success) throw `[holds, "bucket", 78, yes]? didn't fail`;
   },
