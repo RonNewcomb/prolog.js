@@ -11,6 +11,6 @@
 [holds, the container, the capacity, the whether]?
 [holds, "bucket", 7, yes].
 [holds, "bucket", the capacity, yes]?
-more
-more
-more
+more;
+more;
+more;

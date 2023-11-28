@@ -27,6 +27,8 @@ export function title(msg: string): void {
   currentTitle = msg;
 }
 
+export const whitespace = /[ \r\n]/g;
+
 // specific to engine ///////
 
 export const isLiteral = (v: any) => !!v && !!v[0] && v[0].literal && v[0].literal.rvalue;

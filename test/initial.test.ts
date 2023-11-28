@@ -1,6 +1,6 @@
 import { Rule, prolog, database, useDatabase, prettyPrintVarBindings, getVars } from "../src/engine";
 import { clear, importSource, nextline } from "../src/ui";
-import { test, between, title, isLiteral } from "../src/test";
+import { test, between, title, isLiteral, whitespace } from "../src/test";
 
 between(() => useDatabase([]));
 
@@ -39,7 +39,6 @@ test(
     result = nextline(`[holds, "bucket", 834, yes].`);
     result = nextline(`[holds, "bucket", 78, yes].`);
     const rule: Rule = {
-      head: undefined,
       query: [
         {
           tuple: [
@@ -109,14 +108,14 @@ test(
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
     if (isLiteral(result.num) != magic1) throw `num != ${magic1}`;
-    result = nextline("more");
+    result = nextline("more;");
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
     vars = getVars(result);
     if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
     if (isLiteral(result.num) != magic2) throw `num != ${magic2}`;
-    result = nextline("more");
+    result = nextline("more;");
     if (typeof result !== "string") throw "Returned scope instead of no: " + prettyPrintVarBindings(result);
     if (result != "no") throw "retval != no";
   },
@@ -172,10 +171,18 @@ test(
 
   // keep last for copy-pasting into testoutput.txt
   async () => {
-    const filename = "test/testinput.txt";
-    title("Run " + filename);
+    const infilename = "test/testinput.txt";
+    const outfilename = "test/testoutput.txt";
+    title("Run " + infilename + " and match with " + outfilename);
     clear();
-    await importSource(filename); // don't forget to return or await the promise
+    await importSource(infilename); // don't forget to return or await the promise
+    const expected = (await fetch(outfilename).then(r => r.text())).replaceAll(whitespace, "");
+    const actual = document.getElementById("consoleout")!.innerText.replaceAll(whitespace, "");
+    if (expected != actual) {
+      console.log(expected);
+      console.warn(actual);
+      throw outfilename + " didn't match";
+    }
   }
 );
 

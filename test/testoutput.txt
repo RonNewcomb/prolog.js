@@ -1,4 +1,3 @@
- Show parse results
 Fetching test/testinput.txt
 # testing basics
 👍
@@ -26,9 +25,9 @@ The container is "bucket".
 Memorized.
 [holds, "bucket", the capacity, yes]?
 The capacity is 834.
-more
+more;
 The capacity is 7.
-more
+more;
 No.
-more
+more;
 No.

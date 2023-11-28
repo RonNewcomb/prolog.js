@@ -4,6 +4,13 @@ import "../../tmp/projama.js"; // found from /tmp/src2/engine2.js
 
 const grammar = Grammar.fromCompiled((window as any).grammar); // created by iife in projama.js
 
+export interface Command {
+  command: {
+    rvalue: string | number | boolean;
+    rtype: "bareword" | "string" | "number" | "boolean";
+    bareword?: string;
+  };
+}
 export interface Literal {
   literal: {
     rvalue: string | number | boolean;
@@ -31,27 +38,10 @@ export interface Rule {
   query?: Tuple[];
 }
 export interface InputFile {
-  lines: Rule[];
+  lines: (Rule | Command)[];
 }
 
-const sample2: InputFile = {
-  lines: [
-    {
-      query: [
-        {
-          tuple: [
-            { literal: { rtype: "bareword", rvalue: "holds", bareword: "holds" } },
-            { literal: { rtype: "string", rvalue: "bucket" } },
-            { literal: { rtype: "number", rvalue: "834" } },
-            { literal: { rtype: "bareword", rvalue: "yes", bareword: "yes" } },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
-type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
+export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
 export type Database = Rule[];
 
 interface GraphNode {
@@ -75,12 +65,27 @@ export let database: Database = [];
 export const useDatabase = (db: Database) => (database = db);
 let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
-export function prolog(database: Database, rule: Rule | undefined): "memorized" | "yes" | "no" | Scope {
-  if (rule?.head) {
+export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Scope {
+  if ("command" in rule) {
+    switch (rule.command.rvalue) {
+      case "more":
+        failThatAnswer(previousRun);
+        break;
+      case "listing":
+        database.forEach(rule => printAnswerline(JSON.stringify(rule)));
+        return "yes";
+      case "clear":
+        clear();
+        return "yes";
+      default:
+        return "no";
+    }
+  }
+  if ("head" in rule && rule.head) {
     database.push(rule);
     return "memorized";
   }
-  previousRun = rule?.query ? <GraphNode>{ queryToProve: rule?.query[0], database, dbIndex: -1 } : previousRun;
+  previousRun = "query" in rule ? <GraphNode>{ queryToProve: rule.query?.[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
   return result == Direction.Failing ? "no" : previousRun.vars ? previousRun.vars : "yes";
 }
@@ -213,27 +218,20 @@ interface ErrorShape {
 
 onNextLine(line => {
   try {
-    let rule: Rule | undefined = undefined;
-    if (line == "listing") return database.forEach(rule => printAnswerline(JSON.stringify(rule)));
-    if (line == "clear") return clear();
-    if (line == "more") failThatAnswer(previousRun);
-    else {
-      const { results: interpretations } = new Parser(grammar).feed(line);
-      if (interpretations.length == 0) console.warn("Cannot interpret.");
-      if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
-      const inputfile: InputFile = interpretations[interpretations.length - 1];
-      rule = inputfile.lines.pop();
-      if (!rule) return;
-      printEcholine(JSON.stringify(rule));
-    }
+    const { results: interpretations } = new Parser(grammar).feed(line);
+    if (interpretations.length == 0) return console.warn("Cannot interpret.");
+    if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
+    const rule = interpretations[0].lines.pop();
+    if (!rule) return;
+    printEcholine(JSON.stringify(rule));
     const result = prolog(database, rule);
     printAnswerline(typeof result === "string" ? result[0].toUpperCase() + result.slice(1) + "." : prettyPrintVarBindings(result));
-    //console.log(previousRun);
     return result;
   } catch (e: any) {
     const msg = "ERROR: " + JSON.stringify(e as ErrorShape);
     consoleOutError(msg);
     console.error(line, msg);
+    return;
   }
 });
 
