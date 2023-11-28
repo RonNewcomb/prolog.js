@@ -1,6 +1,6 @@
-import { Rule, prolog, database, useDatabase, prettyPrintVarBindings } from "../src/engine";
+import { Rule, prolog, database, useDatabase, prettyPrintVarBindings, getVars } from "../src/engine";
 import { clear, importSource, nextline } from "../src/ui";
-import { test, between, title, isLiteral, getVars } from "../src/test";
+import { test, between, title, isLiteral } from "../src/test";
 
 between(() => useDatabase([]));
 
@@ -178,3 +178,8 @@ test(
     await importSource(filename); // don't forget to return or await the promise
   }
 );
+
+// 9 🚨 can use a var in a fact  ->  Returned scope instead of yes: The anything is 654.
+// 10 🚨 can query with an if that uses a var  ->  Returned The number is 834. instead of yes
+// 11 🚨 can query with a var and an if that uses a different var  ->  answer != 45, is undefined
+// 12 🚨 can query with a var and an if that uses the same var (name collision?)  ->  number != 12, is false

@@ -29,10 +29,4 @@ export function title(msg: string): void {
 
 // specific to engine ///////
 
-export const getVars = (scope: any): string[] => {
-  const vars: string[] = [];
-  for (let v in scope) vars.push(v);
-  return vars;
-};
-
 export const isLiteral = (v: any) => !!v && !!v[0] && v[0].literal && v[0].literal.rvalue;

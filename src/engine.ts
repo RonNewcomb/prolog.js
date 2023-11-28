@@ -218,14 +218,11 @@ onNextLine(line => {
     if (line == "clear") return clear();
     if (line == "more") failThatAnswer(previousRun);
     else {
-      const { results } = new Parser(grammar).feed(line);
-      const interpretations: InputFile[] = results;
+      const { results: interpretations } = new Parser(grammar).feed(line);
       if (interpretations.length == 0) console.warn("Cannot interpret.");
       if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
       const inputfile: InputFile = interpretations[interpretations.length - 1];
-      //console.log(inputfile.lines);
       rule = inputfile.lines.pop();
-      //console.log(JSON.stringify(rule));
       if (!rule) return;
       printEcholine(JSON.stringify(rule));
     }
@@ -240,11 +237,15 @@ onNextLine(line => {
   }
 });
 
+export const getVars = (scope: any): string[] => {
+  const vars: string[] = [];
+  for (let v in scope) vars.push(v); // for..in also gets inherited properties
+  return vars;
+};
+
 export function prettyPrintVarBindings(scope: Scope): string {
   if (typeof scope == "string") return scope;
-  const vars = [];
-  for (let v in scope) vars.push(v);
-  // console.log(JSON.stringify(vars));
+  const vars = getVars(scope);
   if (vars.length == 0) return "Yes";
   return vars
     .map(varName => {
