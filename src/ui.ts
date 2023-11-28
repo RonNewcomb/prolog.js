@@ -79,7 +79,10 @@ export async function importSource(filename: string) {
 const emojiThumbsUp = "&#x1F44D;";
 
 let processLine: (string: string) => any = () => [];
-export const onNextLine = (fn: typeof processLine) => (processLine = fn);
+
+export const onNextLine = (fn: typeof processLine) => {
+  processLine = fn;
+};
 
 export function nextline(line: string) {
   line = (line || "").trim();
@@ -87,8 +90,11 @@ export function nextline(line: string) {
   printUserline(line);
   previousInput.push(line);
   if (line.match(/^\s*#/)) return printAnswerline(emojiThumbsUp); //== ops.comment
-  const db = processLine(line);
+  const result = processLine(line);
   commandLineEl.focus();
+  return result;
 }
 
-export const clear = () => (consoleOutEl.innerHTML = "");
+export const clear = () => {
+  consoleOutEl.innerHTML = "";
+};

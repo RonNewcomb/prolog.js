@@ -220,6 +220,7 @@ onNextLine(line => {
     else {
       const { results } = new Parser(grammar).feed(line);
       const interpretations: InputFile[] = results;
+      if (interpretations.length == 0) console.warn("Cannot interpret.");
       if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
       const inputfile: InputFile = interpretations[interpretations.length - 1];
       //console.log(inputfile.lines);
@@ -231,12 +232,16 @@ onNextLine(line => {
     const result = prolog(database, rule);
     printAnswerline(typeof result === "string" ? result[0].toUpperCase() + result.slice(1) + "." : prettyPrintVarBindings(result));
     //console.log(previousRun);
+    return result;
   } catch (e: any) {
-    consoleOutError("ERROR: " + JSON.stringify(e as ErrorShape));
+    const msg = "ERROR: " + JSON.stringify(e as ErrorShape);
+    consoleOutError(msg);
+    console.error(line, msg);
   }
 });
 
 export function prettyPrintVarBindings(scope: Scope): string {
+  if (typeof scope == "string") return scope;
   const vars = [];
   for (let v in scope) vars.push(v);
   // console.log(JSON.stringify(vars));
