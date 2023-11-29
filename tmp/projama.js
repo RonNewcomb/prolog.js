@@ -5,12 +5,12 @@ function id(x) { return x[0]; }
 var grammar = {
     Lexer: undefined,
     ParserRules: [
-    {"name": "main$ebnf$1", "symbols": ["line"]},
-    {"name": "main$ebnf$1", "symbols": ["main$ebnf$1", "line"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
-    {"name": "main", "symbols": ["main$ebnf$1"], "postprocess": d => ({ lines: d.flat(4)})},
-    {"name": "line", "symbols": ["rule"]},
-    {"name": "line", "symbols": ["query"]},
-    {"name": "line", "symbols": ["command"]},
+    {"name": "main$ebnf$1", "symbols": ["statement"]},
+    {"name": "main$ebnf$1", "symbols": ["main$ebnf$1", "statement"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "main", "symbols": ["main$ebnf$1"], "postprocess": d => ({ statements: d.flat(4)})},
+    {"name": "statement", "symbols": ["rule"]},
+    {"name": "statement", "symbols": ["query"]},
+    {"name": "statement", "symbols": ["command"]},
     {"name": "rule$ebnf$1$subexpression$1$string$1", "symbols": [{"literal":"i"}, {"literal":"f"}], "postprocess": function joiner(d) {return d.join('');}},
     {"name": "rule$ebnf$1$subexpression$1", "symbols": ["__", "rule$ebnf$1$subexpression$1$string$1", "__", "tuplelist"]},
     {"name": "rule$ebnf$1", "symbols": ["rule$ebnf$1$subexpression$1"], "postprocess": id},

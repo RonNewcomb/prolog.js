@@ -10,6 +10,8 @@ export interface Command {
     rtype: "bareword" | "string" | "number" | "boolean";
     bareword?: string;
   };
+  head?: never; // for typechecking
+  query?: never; // for typechecking
 }
 export interface Literal {
   literal: {
@@ -36,9 +38,11 @@ export interface Tuple {
 export interface Rule {
   head?: Tuple;
   query?: Tuple[];
+  command?: never; // for typechecking
 }
+export type Statement = Rule | Command;
 export interface InputFile {
-  lines: (Rule | Command)[];
+  statements: Statement[];
 }
 
 export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
@@ -66,7 +70,7 @@ export const useDatabase = (db: Database) => (database = db);
 let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
 
 export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Scope {
-  if ("command" in rule) {
+  if (rule.command) {
     switch (rule.command.rvalue) {
       case "more":
         failThatAnswer(previousRun);
@@ -81,24 +85,19 @@ export function prolog(database: Database, rule: Rule | Command): "memorized" | 
         return "no";
     }
   }
-  if ("head" in rule && rule.head) {
+  if (rule.head) {
     database.push(rule);
     return "memorized";
   }
-  previousRun = "query" in rule ? <GraphNode>{ queryToProve: rule.query?.[0], database, dbIndex: -1 } : previousRun;
+  previousRun = rule.query ? <GraphNode>{ queryToProve: rule.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
   return result == Direction.Failing ? "no" : previousRun.vars ? previousRun.vars : "yes";
 }
 
-export function failThatAnswer(current: GraphNode): void {
+function failThatAnswer(current: GraphNode): void {
   if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
   else current.vars = undefined;
 }
-
-export const listing = () => database.forEach(rule => console.log(JSON.stringify(rule)));
-
-console.info("enter listing() to show the database");
-(window as any).listing = listing;
 
 /*
 for every goal, 
@@ -218,10 +217,11 @@ interface ErrorShape {
 
 onNextLine(line => {
   try {
-    const { results: interpretations } = new Parser(grammar).feed(line);
-    if (interpretations.length == 0) return console.warn("Cannot interpret.");
+    const parser = new Parser(grammar).feed(line);
+    const interpretations: InputFile[] = parser.results;
+    if (interpretations.length == 0) throw "Cannot interpret.";
     if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
-    const rule = interpretations[0].lines.pop();
+    const rule = interpretations[0].statements.pop();
     if (!rule) return;
     printEcholine(JSON.stringify(rule));
     const result = prolog(database, rule);

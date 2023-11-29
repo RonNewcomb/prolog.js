@@ -6,8 +6,8 @@
 # nearleyc ./src/projama.ne -o ./tmp/projama.js && nearley-test ./tmp/projama.js -qi "[holds, \"bucket\", 834, yes]?"
 # nearleyc ./src/projama.ne -o ./tmp/projama.js && nearley-test ./tmp/projama.js -qi "[drive, \"bob\", [downtown], the car, 50.5, no] if [drive], [start]."  
 
-main      -> line:+                                             {% d => ({ lines: d.flat(4)}) %}
-line      -> rule | query | command                            #{% d => ({ lines: d[0] }) %}
+main      -> statement:+                                        {% d => ({ statements: d.flat(4)}) %}
+statement -> rule | query | command                            #{% d => ({ statements: d[0] }) %}
 rule      -> _ tuple (__ "if" __ tuplelist):? "." _             {% d => ({ head: d[1], query: d.slice(2).flat(2).filter(x => !!x && typeof x !== 'string')[0]?.tuplelist ?? [] }) %}
 query     -> _ tuplelist "?" _                                  {% d => ({ query: d[1] }) %}
 command   -> _ bareword _ ";" _                                 {% d => ({ command: d[1] }) %}
