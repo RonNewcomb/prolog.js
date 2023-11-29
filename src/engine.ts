@@ -110,9 +110,6 @@ function goer(current: GraphNode): Direction {
   on_backtracking: do {
     // find a rule in database that unifies with current .queryToProve (unification sets .vars)
     if (!current.vars) {
-      // clean this
-      current.querysToProve = [];
-
       // find a rule in the db that unifies with our current.queryToProve
       let nextrule: Rule | undefined;
       while (!current.vars) {
@@ -121,34 +118,30 @@ function goer(current: GraphNode): Direction {
         nextrule = current.database[current.dbIndex];
 
         // if we ran out of rules to try, return failure.
-        if (!nextrule) return Direction.Failing;
+        if (!nextrule) {
+          current.querysToProve = undefined; // clean prior results just in case
+          return Direction.Failing;
+        }
 
         // does it unify?
         current.vars = unify(current.vars || {}, current.queryToProve, nextrule.head!);
       }
 
-      // console.log("UNIFIED with rule #", current.dbIndex);
-
       // we found a rule that unified. If it had conditions, we will try those conditions
-      if (nextrule!.query)
-        for (const query of nextrule!.query)
-          current.querysToProve.push({
-            queryToProve: query,
-            database: current.database,
-            dbIndex: -1,
-          });
+      current.querysToProve = nextrule?.query?.map(query => ({ queryToProve: query, database: current.database, dbIndex: -1 })) || undefined;
     }
 
     // check children recursively, regardless whether this is a replay or they're fresh
-    for (const query of current.querysToProve!) {
-      // child returns success or failure.
-      const state = goer(query);
-      if (state == Direction.Succeeded) continue;
+    if (current.querysToProve)
+      for (const query of current.querysToProve) {
+        // child returns success or failure.
+        const state = goer(query);
+        if (state == Direction.Succeeded) continue;
 
-      // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
-      current.vars = undefined;
-      continue on_backtracking; // javascript's weird way of doing a GOTO
-    }
+        // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
+        current.vars = undefined;
+        continue on_backtracking; // javascript's weird way of doing a GOTO
+      }
   } while (false); // javascript's weird way of doing a GOTO
 
   return Direction.Succeeded; // all children succeeded, so, I do too.
@@ -178,14 +171,6 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
-function addToScope(oldScope: Scope | undefined, varName: string, tupleItem: TupleItem): Scope {
-  // a new scope is subclassed to ease rollbacking the assignment to varName
-  const newScope = oldScope || {}; // Object.create(oldScope || null) as Scope;
-  // the value is wrapped in an [...] so we can use references when many vars point to each other and only the last to the tuple/literal
-  newScope[varName] = [tupleItem];
-  return newScope;
-}
-
 function replaceBoundVarsWithLiterals(item: TupleItem, scope: Scope): TupleItem {
   // value of a literal is itself
   if (item.literal) return item;
@@ -202,9 +187,15 @@ function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | un
   const x = replaceBoundVarsWithLiterals(a, scope);
   const y = replaceBoundVarsWithLiterals(b, scope);
   // now check UN-bound vars
-  if (x.variable) return addToScope(scope, x.variable.bareword, y);
-  if (y.variable) return addToScope(scope, y.variable.bareword, x);
-  if (x.literal || y.literal) return x.literal!.rvalue == y.literal!.rvalue ? scope : undefined;
+  if (x.variable) {
+    scope[x.variable.bareword] = [y]; // bind a to what's in b
+    return scope;
+  }
+  if (y.variable) {
+    scope[y.variable.bareword] = [x]; // bind b to what's in a
+    return scope;
+  }
+  if (x.literal || y.literal) return x.literal && y.literal && x.literal.rvalue == y.literal.rvalue ? scope : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
   for (let i = 0; i < x.tuple.length; i++) scope = unify(scope, x.tuple[i], y.tuple[i]);
   return scope;
@@ -221,10 +212,10 @@ onNextLine(line => {
     const interpretations: InputFile[] = parser.results;
     if (interpretations.length == 0) throw "Cannot interpret.";
     if (interpretations.length > 1) console.warn("WARNING: multiple interpretations");
-    const rule = interpretations[0].statements.pop();
-    if (!rule) return;
-    printEcholine(JSON.stringify(rule));
-    const result = prolog(database, rule);
+    const statement = interpretations[0].statements.pop();
+    if (!statement) return;
+    printEcholine(JSON.stringify(statement));
+    const result = prolog(database, statement);
     printAnswerline(typeof result === "string" ? result[0].toUpperCase() + result.slice(1) + "." : prettyPrintVarBindings(result));
     return result;
   } catch (e: any) {
