@@ -91,7 +91,7 @@ export function prolog(database: Database, rule: Rule | Command): "memorized" | 
   }
   previousRun = rule.query ? <GraphNode>{ queryToProve: rule.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
-  return result == Direction.Failing ? "no" : previousRun.vars ? previousRun.vars : "yes";
+  return result == Direction.Failing ? "no" : previousRun.vars && Object.keys(previousRun.vars).length > 0 ? previousRun.vars : "yes";
 }
 
 function failThatAnswer(current: GraphNode): void {
@@ -180,17 +180,17 @@ to create new scope (from an old one)
 
 function addToScope(oldScope: Scope | undefined, varName: string, tupleItem: TupleItem): Scope {
   // a new scope is subclassed to ease rollbacking the assignment to varName
-  const newScope = Object.create(oldScope || null) as Scope;
+  const newScope = oldScope || {}; // Object.create(oldScope || null) as Scope;
   // the value is wrapped in an [...] so we can use references when many vars point to each other and only the last to the tuple/literal
   newScope[varName] = [tupleItem];
   return newScope;
 }
 
-function valueOf(item: TupleItem, scope: Scope): TupleItem {
+function replaceBoundVarsWithLiterals(item: TupleItem, scope: Scope): TupleItem {
   // value of a literal is itself
   if (item.literal) return item;
   // value of a tuple is a tuple of the values of each item in the tuple
-  if (item.tuple) return { tuple: item.tuple.map(it => valueOf(it, scope)) };
+  if (item.tuple) return { tuple: item.tuple.map(it => replaceBoundVarsWithLiterals(it, scope)) };
   // value of a bound var is the literal or tuple its bound to
   const isBoundVar = scope[item.variable.bareword];
   // value of an unbound var is itself
@@ -199,9 +199,9 @@ function valueOf(item: TupleItem, scope: Scope): TupleItem {
 
 function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | undefined {
   if (!scope) return undefined;
-  const x = valueOf(a, scope);
-  const y = valueOf(b, scope);
-  // console.log("trying to unify", x, "with", y);
+  const x = replaceBoundVarsWithLiterals(a, scope);
+  const y = replaceBoundVarsWithLiterals(b, scope);
+  // now check UN-bound vars
   if (x.variable) return addToScope(scope, x.variable.bareword, y);
   if (y.variable) return addToScope(scope, y.variable.bareword, x);
   if (x.literal || y.literal) return x.literal!.rvalue == y.literal!.rvalue ? scope : undefined;
@@ -235,22 +235,15 @@ onNextLine(line => {
   }
 });
 
-export const getVars = (scope: any): string[] => {
-  const vars: string[] = [];
-  for (let v in scope) vars.push(v); // for..in also gets inherited properties
-  return vars;
-};
-
-export function prettyPrintVarBindings(scope: Scope): string {
-  if (typeof scope == "string") return scope;
-  const vars = getVars(scope);
-  if (vars.length == 0) return "Yes";
-  return vars
-    .map(varName => {
-      const container = scope[varName][0];
-      let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
-      if (container.literal?.rtype == "string") val = `"${val}"`;
-      return `The ${varName} is ${val}.`;
-    })
-    .join("\n");
-}
+export const prettyPrintVarBindings = (scope: Scope): string =>
+  typeof scope == "string"
+    ? scope
+    : Object.keys(scope)
+        .sort((a, b) => (a < b ? -1 : +1))
+        .map(varName => {
+          const container = scope[varName][0];
+          let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
+          if (container.literal?.rtype == "string") val = `"${val}"`;
+          return `The ${varName} is ${val}.`;
+        })
+        .join("\n");

@@ -4,7 +4,7 @@ Fetching test/testinput.txt
 [holds, "bucket", 834, yes].
 Memorized.
 [holds, "bucket", 834, yes]?
-Yes
+Yes.
 [holds, "bucket", 76, yes]?
 No.
 [holds, "bucket", the capacity, yes]?
@@ -18,9 +18,9 @@ Memorized.
 [holds, "envelope", 1, yes].
 Memorized.
 [holds, the container, the capacity, the whether]?
-The whether is yes.
 The capacity is 834.
 The container is "bucket".
+The whether is yes.
 [holds, "bucket", 7, yes].
 Memorized.
 [holds, "bucket", the capacity, yes]?

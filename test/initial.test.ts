@@ -1,4 +1,4 @@
-import { Rule, prolog, database, useDatabase, prettyPrintVarBindings, getVars } from "../src/engine";
+import { Rule, prolog, database, useDatabase, prettyPrintVarBindings } from "../src/engine";
 import { clear, importSource, nextline } from "../src/ui";
 import { test, between, title, isLiteral, whitespace } from "../src/test";
 
@@ -83,7 +83,7 @@ test(
     title("can query a fact for multiple vars");
     result = nextline(`[holds, "bucket", 89, yes].`);
     result = nextline(`[holds, the container, the weight, the openable]?`);
-    let vars = getVars(result);
+    let vars = Object.keys(result);
     if (vars.length > 3) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 3) throw "Not enough vars: " + vars.join(" ");
     if (!result.container) throw "Var 'container' not found: " + vars.join(" ");
@@ -103,14 +103,14 @@ test(
     result = nextline(`[holds, "bucket", the num, yes]?`);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
     //console.info(result);
-    let vars = getVars(result);
+    let vars = Object.keys(result);
     if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
     if (isLiteral(result.num) != magic1) throw `num != ${magic1}`;
     result = nextline("more;");
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    vars = getVars(result);
+    vars = Object.keys(result);
     if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
@@ -147,7 +147,7 @@ test(
     result = nextline(`[hold, "bucket", the answer]?`);
     // console.info(result);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    const vars = getVars(result);
+    const vars = Object.keys(result);
     if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.answer) throw "Var 'answer' not found: " + vars.join(" ");
@@ -162,7 +162,7 @@ test(
     result = nextline(`[hold, "bucket", the number]?`);
     // console.info(result);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    const vars = getVars(result);
+    const vars = Object.keys(result);
     if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
     if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
     if (!result.number) throw "Var 'number' not found: " + vars.join(" ");
@@ -180,7 +180,7 @@ test(
     const actual = document.getElementById("consoleout")!.innerText.replaceAll(whitespace, "");
     if (expected != actual) {
       console.log(expected);
-      console.warn(actual);
+      console.log(actual);
       throw outfilename + " didn't match";
     }
   }
