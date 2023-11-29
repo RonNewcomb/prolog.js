@@ -1,6 +1,6 @@
-import { Rule, prolog, database, useDatabase, prettyPrintVarBindings } from "../src/engine";
+import { Rule, prolog, database, useDatabase, prettyPrintVarBindings, Bindings } from "../src/engine";
 import { clear, importSource, nextline } from "../src/ui";
-import { test, between, title, isLiteral, whitespace } from "../src/test";
+import { test, between, title, isLiteral, whitespace, getVarNamed, bindingsToObj } from "../src/test";
 
 between(() => useDatabase([]));
 
@@ -83,15 +83,15 @@ test(
     title("can query a fact for multiple vars");
     result = nextline(`[holds, "bucket", 89, yes].`);
     result = nextline(`[holds, the container, the weight, the openable]?`);
-    let vars = Object.keys(result);
-    if (vars.length > 3) throw "Too many vars: " + vars.join(" ");
-    if (vars.length < 3) throw "Not enough vars: " + vars.join(" ");
-    if (!result.container) throw "Var 'container' not found: " + vars.join(" ");
-    if (isLiteral(result.container) != "bucket") throw `container != "bucket"`;
-    if (!result.weight) throw "Var 'weight' not found: " + vars.join(" ");
-    if (isLiteral(result.weight) != "89") throw `weight != 89`;
-    if (!result.openable) throw "Var 'openable' not found: " + vars.join(" ");
-    if (isLiteral(result.openable) != "yes") throw `openable != "yes"`;
+    if (result.length > 3) throw "Too many vars: " + result.join(" ");
+    if (result.length < 3) throw "Not enough vars: " + result.join(" ");
+    const vars = bindingsToObj(result);
+    if (!vars.weight) throw "Var 'weight' not found: " + result.join(" ");
+    if (isLiteral(vars.weight) != "89") throw `weight != 89`;
+    if (!vars.container) throw "Var 'container' not found: " + result.join(" ");
+    if (isLiteral(vars.container) != "bucket") throw `container != "bucket"`;
+    if (!vars.openable) throw "Var 'openable' not found: " + result.join(" ");
+    if (isLiteral(vars.openable) != "yes") throw `openable != "yes"`;
   },
 
   () => {
@@ -100,21 +100,23 @@ test(
     const magic2 = 543;
     result = nextline(`[holds, "bucket", ${magic1}, yes].`);
     result = nextline(`[holds, "bucket", ${magic2}, yes].`);
+
     result = nextline(`[holds, "bucket", the num, yes]?`);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    //console.info(result);
-    let vars = Object.keys(result);
-    if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
-    if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
-    if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
-    if (isLiteral(result.num) != magic1) throw `num != ${magic1}`;
+    let vars = bindingsToObj(result);
+    if (result.length > 1) throw "Too many vars: " + result.join(" ");
+    if (result.length < 1) throw "Not enough vars: " + result.join(" ");
+    if (!vars.num) throw "Var 'num' not found: " + result.join(" ");
+    if (isLiteral(vars.num) != magic1) throw `num != ${magic1}`;
+
     result = nextline("more;");
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    vars = Object.keys(result);
-    if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
-    if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
-    if (!result.num) throw "Var 'num' not found: " + vars.join(" ");
-    if (isLiteral(result.num) != magic2) throw `num != ${magic2}`;
+    vars = bindingsToObj(result);
+    if (result.length > 1) throw "Too many vars: " + result.join(" ");
+    if (result.length < 1) throw "Not enough vars: " + result.join(" ");
+    if (!vars.num) throw "Var 'num' not found: " + result.join(" ");
+    if (isLiteral(vars.num) != magic2) throw `num != ${magic2}`;
+
     result = nextline("more;");
     if (typeof result !== "string") throw "Returned scope instead of no: " + prettyPrintVarBindings(result);
     if (result != "no") throw "retval != no";
@@ -147,11 +149,11 @@ test(
     result = nextline(`[hold, "bucket", the answer]?`);
     // console.info(result);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    const vars = Object.keys(result);
-    if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
-    if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
-    if (!result.answer) throw "Var 'answer' not found: " + vars.join(" ");
-    if (isLiteral(result.answer) != magic) throw `answer != ${magic}, is ` + isLiteral(result.answer);
+    let vars = bindingsToObj(result);
+    if (result.length > 1) throw "Too many vars: " + result.join(" ");
+    if (result.length < 1) throw "Not enough vars: " + result.join(" ");
+    if (!vars.answer) throw "Var 'answer' not found: " + result.join(" ");
+    if (isLiteral(vars.answer) != magic) throw `answer != ${magic}, is ` + isLiteral(vars.answer);
   },
 
   () => {
@@ -162,20 +164,20 @@ test(
     result = nextline(`[hold, "bucket", the number]?`);
     // console.info(result);
     if (typeof result === "string") throw "Returned " + result + " instead of a scope";
-    const vars = Object.keys(result);
-    if (vars.length > 1) throw "Too many vars: " + vars.join(" ");
-    if (vars.length < 1) throw "Not enough vars: " + vars.join(" ");
-    if (!result.number) throw "Var 'number' not found: " + vars.join(" ");
-    if (isLiteral(result.number) != magic) throw `number != ${magic}, is ` + isLiteral(result.answer);
+    let vars = bindingsToObj(result);
+    if (result.length > 1) throw "Too many vars: " + result.join(" ");
+    if (result.length < 1) throw "Not enough vars: " + result.join(" ");
+    if (!vars.number) throw "Var 'number' not found: " + result.join(" ");
+    if (isLiteral(vars.number) != magic) throw `number != ${magic}, is ` + isLiteral(vars.answer);
   },
 
   // keep last for copy-pasting into testoutput.txt
   async () => {
-    const infilename = "test/testinput.txt";
+    const iinfilename = "test/testinput.txt";
     const outfilename = "test/testoutput.txt";
-    title("Run " + infilename + " and match with " + outfilename);
+    title("Run " + iinfilename + " and match with " + outfilename);
     clear();
-    await importSource(infilename); // don't forget to return or await the promise
+    await importSource(iinfilename); // don't forget to return or await the promise
     const expected = (await fetch(outfilename).then(r => r.text())).replaceAll(whitespace, "");
     const actual = document.getElementById("consoleout")!.innerText.replaceAll(whitespace, "");
     if (expected != actual) {

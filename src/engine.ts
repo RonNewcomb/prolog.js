@@ -45,17 +45,17 @@ export interface InputFile {
   statements: Statement[];
 }
 
-export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
+//export type Scope = Record<string, [TupleItem]>; // the extra [] wrapper is to have pointers to the value
+export type Binding = [TupleItem, TupleItem];
+export type Bindings = Binding[];
 export type Database = Rule[];
 
 interface GraphNode {
-  //parent?: GraphNode;
+  parent?: GraphNode;
   queryToProve: Tuple;
   database: Database;
   dbIndex: number; // backtracking increases this number; unification with head stops increasing it
-  //rule: Rule; // === database[dbIndex]
-  //headThatUnifies: Rule["rule"]["head"];
-  vars?: Scope;
+  bindingsWithParent?: Bindings;
   //queryIndex: number; // rule.body[queryIndex] // backtracking decreases this number; unification increases it
   querysToProve?: GraphNode[];
 }
@@ -67,9 +67,9 @@ const enum Direction {
 
 export let database: Database = [];
 export const useDatabase = (db: Database) => (database = db);
-let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1 };
+let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1, bindingsWithParent: [] };
 
-export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Scope {
+export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Bindings {
   if (rule.command) {
     switch (rule.command.rvalue) {
       case "more":
@@ -91,12 +91,14 @@ export function prolog(database: Database, rule: Rule | Command): "memorized" | 
   }
   previousRun = rule.query ? <GraphNode>{ queryToProve: rule.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
-  return result == Direction.Failing ? "no" : previousRun.vars && Object.keys(previousRun.vars).length > 0 ? previousRun.vars : "yes";
+  if (result == Direction.Failing) return "no";
+  const topLevelBindings = (previousRun.bindingsWithParent || []).filter(([topLevel, _]) => topLevel.variable);
+  return topLevelBindings.length > 0 ? topLevelBindings : "yes";
 }
 
 function failThatAnswer(current: GraphNode): void {
   if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
-  else current.vars = undefined;
+  else current.bindingsWithParent = undefined;
 }
 
 /*
@@ -109,10 +111,10 @@ function goer(current: GraphNode): Direction {
   // on a backtrack, start over // javascript's weird way of doing a GOTO
   on_backtracking: do {
     // find a rule in database that unifies with current .queryToProve (unification sets .vars)
-    if (!current.vars) {
+    if (!current.bindingsWithParent) {
       // find a rule in the db that unifies with our current.queryToProve
       let nextrule: Rule | undefined;
-      while (!current.vars) {
+      while (!current.bindingsWithParent) {
         // get next rule to try
         current.dbIndex++;
         nextrule = current.database[current.dbIndex];
@@ -124,11 +126,11 @@ function goer(current: GraphNode): Direction {
         }
 
         // does it unify?
-        current.vars = unify(current.vars || {}, current.queryToProve, nextrule.head!);
+        current.bindingsWithParent = unify(current.bindingsWithParent || [], current.queryToProve, nextrule.head!);
       }
 
       // we found a rule that unified. If it had conditions, we will try those conditions
-      current.querysToProve = nextrule?.query?.map(query => ({ queryToProve: query, database: current.database, dbIndex: -1 })) || undefined;
+      current.querysToProve = nextrule?.query?.map(query => ({ parent: current, queryToProve: query, database: current.database, dbIndex: -1 })) || undefined;
     }
 
     // check children recursively, regardless whether this is a replay or they're fresh
@@ -139,7 +141,7 @@ function goer(current: GraphNode): Direction {
         if (state == Direction.Succeeded) continue;
 
         // if child didn't succeed, then nextrule doesn't succeed. Reset and restart with a new db rule
-        current.vars = undefined;
+        current.bindingsWithParent = undefined;
         continue on_backtracking; // javascript's weird way of doing a GOTO
       }
   } while (false); // javascript's weird way of doing a GOTO
@@ -171,34 +173,30 @@ to create new scope (from an old one)
    newScope[variable.name] = tupleitem;
 */
 
-function replaceBoundVarsWithLiterals(item: TupleItem, scope: Scope): TupleItem {
+function replaceBoundVarsWithLiterals(item: TupleItem, bindings: Bindings): TupleItem {
   // value of a literal is itself
   if (item.literal) return item;
   // value of a tuple is a tuple of the values of each item in the tuple
-  if (item.tuple) return { tuple: item.tuple.map(it => replaceBoundVarsWithLiterals(it, scope)) };
+  if (item.tuple) return { tuple: item.tuple.map(it => replaceBoundVarsWithLiterals(it, bindings)) };
   // value of a bound var is the literal or tuple its bound to
-  const isBoundVar = scope[item.variable.bareword];
+  const isBoundVar = bindings.find(b => b[0].variable && b[0].variable.bareword == item.variable.bareword);
   // value of an unbound var is itself
-  return isBoundVar ? isBoundVar[0] : item;
+  return isBoundVar ? isBoundVar[1] : item;
 }
 
-function unify(scope: Scope | undefined, a: TupleItem, b: TupleItem): Scope | undefined {
-  if (!scope) return undefined;
-  const x = replaceBoundVarsWithLiterals(a, scope);
-  const y = replaceBoundVarsWithLiterals(b, scope);
+function unify(bindings: Bindings | undefined, a: TupleItem, b: TupleItem): Bindings | undefined {
+  if (!bindings) return undefined;
+  const x = replaceBoundVarsWithLiterals(a, bindings);
+  const y = replaceBoundVarsWithLiterals(b, bindings);
   // now check UN-bound vars
-  if (x.variable) {
-    scope[x.variable.bareword] = [y]; // bind a to what's in b
-    return scope;
+  if (x.variable || y.variable) {
+    bindings.push([x, y]);
+    return bindings;
   }
-  if (y.variable) {
-    scope[y.variable.bareword] = [x]; // bind b to what's in a
-    return scope;
-  }
-  if (x.literal || y.literal) return x.literal && y.literal && x.literal.rvalue == y.literal.rvalue ? scope : undefined;
+  if (x.literal || y.literal) return x.literal && y.literal && x.literal.rvalue == y.literal.rvalue ? bindings : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
-  for (let i = 0; i < x.tuple.length; i++) scope = unify(scope, x.tuple[i], y.tuple[i]);
-  return scope;
+  for (let i = 0; i < x.tuple.length; i++) bindings = unify(bindings, x.tuple[i], y.tuple[i]);
+  return bindings;
 }
 
 interface ErrorShape {
@@ -226,15 +224,18 @@ onNextLine(line => {
   }
 });
 
-export const prettyPrintVarBindings = (scope: Scope): string =>
-  typeof scope == "string"
-    ? scope
-    : Object.keys(scope)
-        .sort((a, b) => (a < b ? -1 : +1))
-        .map(varName => {
-          const container = scope[varName][0];
-          let val = container.literal ? container.literal.rvalue : container.tuple ? container.tuple : container.variable.bareword;
-          if (container.literal?.rtype == "string") val = `"${val}"`;
-          return `The ${varName} is ${val}.`;
-        })
-        .join("\n");
+export const prettyPrintVarBindings = (bindings: Bindings): string =>
+  bindings
+    .map<[string, TupleItem]>(([a, b]) => (a.variable ? [a.variable?.bareword || "", b] : [b.variable?.bareword || "", a]))
+    .sort((a, b) => (a[0] < b[0] ? -1 : +1))
+    .map(([varName, container]) => {
+      const val = container.tuple
+        ? container.tuple
+        : container.variable
+        ? container.variable.bareword
+        : container.literal.rtype == "string"
+        ? `"${container.literal.rvalue}"`
+        : container.literal.rvalue;
+      return `The ${varName} is ${val}.`;
+    })
+    .join("\n");
