@@ -82,9 +82,9 @@ function failThatAnswer(current: GraphNode): void {
   current.bindingsWithParent = undefined;
 }
 
-export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Bindings {
-  if (rule.command) {
-    switch (rule.command.rvalue) {
+export function prolog(database: Database, statement: Statement): "memorized" | "yes" | "no" | Bindings {
+  if (statement.command) {
+    switch (statement.command.rvalue) {
       case "more":
         failThatAnswer(previousRun);
         break;
@@ -98,16 +98,22 @@ export function prolog(database: Database, rule: Rule | Command): "memorized" | 
         return "no";
     }
   }
-  if (rule.head) {
-    database.push(rule);
+  if (statement.head) {
+    // then fact or rule
+    database.push(statement);
     return "memorized";
-  }
-  previousRun = rule.query ? <GraphNode>{ queryToProve: rule.query[0], database, dbIndex: -1 } : previousRun;
+  } // else query
+  previousRun = statement.query ? <GraphNode>{ queryToProve: statement.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
   if (result == Direction.Failing) return "no";
-  const scope = previousRun.bindingsWithParent || [];
-  const topLevelBindings = scope.filter(([topLevel, _]) => topLevel.variable);
+  prettyPrintBindings(previousRun);
+  const topLevelBindings = (previousRun.bindingsWithParent || []).filter(([topLevel, _]) => topLevel.variable);
   return topLevelBindings.length > 0 ? topLevelBindings : "yes";
+}
+
+function prettyPrintBindings(current: GraphNode, indent: string = "") {
+  if (current.bindingsWithParent) console.log(indent + prettyPrintVarBindings(current.bindingsWithParent));
+  if (current.querysToProve) current.querysToProve.forEach(q => prettyPrintBindings(q, indent + "    "));
 }
 
 function goer(current: GraphNode): Direction {
@@ -130,13 +136,12 @@ function goer(current: GraphNode): Direction {
 
         // does it unify?
         current.bindingsWithParent = unify(current.bindingsWithParent || [], current.queryToProve, nextrule.head!);
-
-        if (current.bindingsWithParent) console.log(`[UNIFIED: ${prettyPrintTupleItem(current.queryToProve)} with ${prettyPrintTupleItem(nextrule.head)}]`);
       }
+      console.log(`[UNIFIED: ${prettyPrintTupleItem(current.queryToProve)} with ${prettyPrintTupleItem(nextrule!.head)}]`);
 
       // we found a rule that unified. If it had conditions, we will try those conditions
       current.querysToProve = nextrule?.query?.map(query => ({ parent: current, queryToProve: query, database: current.database, dbIndex: -1 })) || undefined;
-      if (nextrule?.query) console.log(`[NOW TRY ${nextrule.query.map(prettyPrintTupleItem)}]`);
+      if (nextrule?.query?.length) console.log(`[NOW TRY ${nextrule.query.map(prettyPrintTupleItem)}]`);
     }
 
     // check children recursively, regardless whether this is a replay or they're fresh
@@ -178,11 +183,10 @@ function unify(bindings: Bindings, a: TupleItem, b: TupleItem): Bindings | undef
   if (x.literal || y.literal) return x.literal && y.literal && x.literal.rvalue == y.literal.rvalue ? bindings : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
   for (let i = 0; i < x.tuple.length; i++) {
-    bindings = bindings && unify(bindings, x.tuple[i], y.tuple[i])!;
-    if (!bindings) {
-      console.log(`[UN-UNIFY ${JSON.stringify(x.tuple[i])} doesn't unify with ${JSON.stringify(y.tuple[i])}]`);
-      return undefined;
-    }
+    bindings = unify(bindings, x.tuple[i], y.tuple[i])!;
+    if (bindings) continue;
+    console.log(`[UN-UNIFY ${JSON.stringify(x.tuple[i])} doesn't unify with ${JSON.stringify(y.tuple[i])}]`);
+    return undefined;
   }
   return bindings;
 }
@@ -220,7 +224,7 @@ export const prettyPrintVarBindings = (bindings: Bindings): string =>
       const val = container.tuple
         ? container.tuple
         : container.variable
-        ? container.variable.bareword
+        ? `the ${container.variable.bareword}`
         : container.literal.rtype == "string"
         ? `"${container.literal.rvalue}"`
         : container.literal.rvalue;
