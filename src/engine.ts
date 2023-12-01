@@ -65,9 +65,22 @@ const enum Direction {
   Succeeded,
 }
 
+export function prettyPrintTupleItem(t?: TupleItem): string {
+  if (!t) return "undefined";
+  if (t.literal) return t.literal.rvalue.toString();
+  if (t.tuple) return `[${t.tuple.map(prettyPrintTupleItem).join(", ")}]`;
+  if (t.variable) `var ${t.variable.bareword}`;
+  return JSON.stringify(t);
+}
+
 export let database: Database = [];
 export const useDatabase = (db: Database) => (database = db);
 let previousRun: GraphNode = { queryToProve: { tuple: [] }, database, dbIndex: -1, bindingsWithParent: [] };
+
+function failThatAnswer(current: GraphNode): void {
+  while (current.querysToProve && current.querysToProve.length) current = current.querysToProve[current.querysToProve.length - 1];
+  current.bindingsWithParent = undefined;
+}
 
 export function prolog(database: Database, rule: Rule | Command): "memorized" | "yes" | "no" | Bindings {
   if (rule.command) {
@@ -92,21 +105,11 @@ export function prolog(database: Database, rule: Rule | Command): "memorized" | 
   previousRun = rule.query ? <GraphNode>{ queryToProve: rule.query[0], database, dbIndex: -1 } : previousRun;
   const result = goer(previousRun);
   if (result == Direction.Failing) return "no";
-  const topLevelBindings = (previousRun.bindingsWithParent || []).filter(([topLevel, _]) => topLevel.variable);
+  const scope = previousRun.bindingsWithParent || [];
+  const topLevelBindings = scope.filter(([topLevel, _]) => topLevel.variable);
   return topLevelBindings.length > 0 ? topLevelBindings : "yes";
 }
 
-function failThatAnswer(current: GraphNode): void {
-  if (current.querysToProve && current.querysToProve.length) failThatAnswer(current.querysToProve[current.querysToProve.length - 1]);
-  else current.bindingsWithParent = undefined;
-}
-
-/*
-for every goal, 
-  find [the next] rule in the database which unifies with its head 
-  for each of the rule body's subgoals, <recurse>
-  if no rule head in the database unifies with it, or no rule with a body fully unifies, backtrack & try the next, 
-*/
 function goer(current: GraphNode): Direction {
   // on a backtrack, start over // javascript's weird way of doing a GOTO
   on_backtracking: do {
@@ -127,10 +130,13 @@ function goer(current: GraphNode): Direction {
 
         // does it unify?
         current.bindingsWithParent = unify(current.bindingsWithParent || [], current.queryToProve, nextrule.head!);
+
+        if (current.bindingsWithParent) console.log(`[UNIFIED: ${prettyPrintTupleItem(current.queryToProve)} with ${prettyPrintTupleItem(nextrule.head)}]`);
       }
 
       // we found a rule that unified. If it had conditions, we will try those conditions
       current.querysToProve = nextrule?.query?.map(query => ({ parent: current, queryToProve: query, database: current.database, dbIndex: -1 })) || undefined;
+      if (nextrule?.query) console.log(`[NOW TRY ${nextrule.query.map(prettyPrintTupleItem)}]`);
     }
 
     // check children recursively, regardless whether this is a replay or they're fresh
@@ -149,30 +155,6 @@ function goer(current: GraphNode): Direction {
   return Direction.Succeeded; // all children succeeded, so, I do too.
 }
 
-/*
-to get the Value of a tupleitem,
-   if its also a tuple, it stays a tuple but each of its own items follow this
-   if its a literal it stays a literal
-   if its an unbound var it stays an unbound var
-   if its a bound var its what's inside the var:  scope[variable.name][0] 
-to unify two tupleitems,
-   get the Value of each -- all bound vars just became literals or tuples
-   if either is an unbound var, create new scope binding the unbound to the other
-   if either is a literal, then both must be literal and values equal; no new scope needed creating
-   else, both are tuples, so,
-   TO UNIFY TWO TUPLES:
-    so, each respective pair must unify (implying length is same)
-    if the length doesn't match, no unify
-    starting with the current scope,
-      unify each respective tupleitem pairs, building up new scope each time
-      if any pair doesn't unify then the tuples don't unify
-    ... notice that the only time a new scope is Actually created is when an unbound var gets bound to something
-to create new scope (from an old one)
-   create a new object subclassed from the old one
-   newScope = Object.create(oldScope || null);
-   newScope[variable.name] = tupleitem;
-*/
-
 function replaceBoundVarsWithLiterals(item: TupleItem, bindings: Bindings): TupleItem {
   // value of a literal is itself
   if (item.literal) return item;
@@ -184,18 +166,24 @@ function replaceBoundVarsWithLiterals(item: TupleItem, bindings: Bindings): Tupl
   return isBoundVar ? isBoundVar[1] : item;
 }
 
-function unify(bindings: Bindings | undefined, a: TupleItem, b: TupleItem): Bindings | undefined {
-  if (!bindings) return undefined;
+function unify(bindings: Bindings, a: TupleItem, b: TupleItem): Bindings | undefined {
   const x = replaceBoundVarsWithLiterals(a, bindings);
   const y = replaceBoundVarsWithLiterals(b, bindings);
-  // now check UN-bound vars
+  // now check un-bound vars
   if (x.variable || y.variable) {
+    console.log(`[Bound ${JSON.stringify(x)} to ${JSON.stringify(y)}]`);
     bindings.push([x, y]);
     return bindings;
   }
   if (x.literal || y.literal) return x.literal && y.literal && x.literal.rvalue == y.literal.rvalue ? bindings : undefined;
   if (x.tuple.length != y.tuple.length) return undefined;
-  for (let i = 0; i < x.tuple.length; i++) bindings = unify(bindings, x.tuple[i], y.tuple[i]);
+  for (let i = 0; i < x.tuple.length; i++) {
+    bindings = bindings && unify(bindings, x.tuple[i], y.tuple[i])!;
+    if (!bindings) {
+      console.log(`[UN-UNIFY ${JSON.stringify(x.tuple[i])} doesn't unify with ${JSON.stringify(y.tuple[i])}]`);
+      return undefined;
+    }
+  }
   return bindings;
 }
 

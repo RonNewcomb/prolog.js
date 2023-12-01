@@ -15,7 +15,7 @@ var grammar = {
     {"name": "rule$ebnf$1$subexpression$1", "symbols": ["__", "rule$ebnf$1$subexpression$1$string$1", "__", "tuplelist"]},
     {"name": "rule$ebnf$1", "symbols": ["rule$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "rule$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "rule", "symbols": ["_", "tuple", "rule$ebnf$1", {"literal":"."}, "_"], "postprocess": d => ({ head: d[1], query: d.slice(2).flat(2).filter(x => !!x && typeof x !== 'string')[0]?.tuplelist ?? [] })},
+    {"name": "rule", "symbols": ["_", "tuple", "rule$ebnf$1", {"literal":"."}, "_"], "postprocess": d => ({ head: d[1], query: d.slice(2).flat(2).filter(x => !!x && typeof x !== 'string') ?? [] })},
     {"name": "query", "symbols": ["_", "tuplelist", {"literal":"?"}, "_"], "postprocess": d => ({ query: d[1] })},
     {"name": "command", "symbols": ["_", "bareword", "_", {"literal":";"}, "_"], "postprocess": d => ({ command: d[1] })},
     {"name": "tuplelist$ebnf$1", "symbols": []},

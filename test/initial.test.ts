@@ -8,6 +8,7 @@ let result: any;
 
 test(
   () => {
+    title("AST [holds, bucket, 834, yes].");
     const rule: Rule = {
       head: {
         tuple: [
@@ -24,11 +25,13 @@ test(
   },
 
   () => {
+    title("parsed [holds, bucket, 834, yes].");
     result = nextline(`[holds, "bucket", 834, yes].`);
     if (database.length !== 1) throw "nextline didn't insert rule";
   },
 
   () => {
+    title("two assertions and a query, only two saved");
     result = nextline(`[holds, "bucket", 834, yes].`);
     result = nextline(`[holds, "bucket", 78, yes].`);
     result = nextline(`[holds, "bucket", 834, yes]?`);
@@ -56,6 +59,7 @@ test(
   },
 
   () => {
+    title("parse a fact, ast query for NO");
     result = nextline(`[holds, "bucket", 834, yes].`);
     const rule: Rule = {
       head: undefined,
@@ -102,7 +106,7 @@ test(
     result = nextline(`[holds, "bucket", ${magic2}, yes].`);
 
     result = nextline(`[holds, "bucket", the num, yes]?`);
-    if (typeof result === "string") throw "Returned " + result + " instead of a scope";
+    if (typeof result === "string") throw "Returned " + result + " instead of some bindings";
     let vars = bindingsToObj(result);
     if (result.length > 1) throw "Too many vars: " + result.join(" ");
     if (result.length < 1) throw "Not enough vars: " + result.join(" ");
@@ -110,7 +114,7 @@ test(
     if (isLiteral(vars.num) != magic1) throw `num != ${magic1}`;
 
     result = nextline("more;");
-    if (typeof result === "string") throw "Returned " + result + " instead of a scope";
+    if (typeof result === "string") throw "Returned " + result + " instead of some bindings";
     vars = bindingsToObj(result);
     if (result.length > 1) throw "Too many vars: " + result.join(" ");
     if (result.length < 1) throw "Not enough vars: " + result.join(" ");
@@ -142,18 +146,30 @@ test(
   },
 
   () => {
+    title("Ensure query has something");
+    result = nextline(`[hold, "bucket", the number] if [holds, "bucket", the number, yes].`);
+    if (!database[0] || !database.length) throw "conditional fact (rule) wasn't memorized";
+    if (!database[0].query) throw "query isn't an array";
+    if (!database[0].query) throw "query isn't an array";
+    if (!database[0].query.length) throw "query is empty";
+    if (!database[0].query[0].tuple) throw "query lacks a tuple";
+    if (!database[0].query[0].tuple.length) throw "query's tuple is empty";
+    if (database[0].query[0].tuple.length != 4) throw "query's tuple isn't 4 items";
+  },
+
+  () => {
     title("can query with a var and an if that uses a different var");
     const magic = 45;
     result = nextline(`[holds, "bucket", ${magic}, yes].`);
     result = nextline(`[hold, "bucket", the number] if [holds, "bucket", the number, yes].`);
     result = nextline(`[hold, "bucket", the answer]?`);
-    // console.info(result);
-    if (typeof result === "string") throw "Returned " + result + " instead of a scope";
+
+    if (typeof result === "string") throw "Returned " + result + " instead of some bindings";
     let vars = bindingsToObj(result);
     if (result.length > 1) throw "Too many vars: " + result.join(" ");
     if (result.length < 1) throw "Not enough vars: " + result.join(" ");
-    if (!vars.answer) throw "Var 'answer' not found: " + result.join(" ");
-    if (isLiteral(vars.answer) != magic) throw `answer != ${magic}, is ` + isLiteral(vars.answer);
+    if (!vars.answer) throw "Var 'answer' not found: " + JSON.stringify(result);
+    if (isLiteral(vars.answer) != magic) throw `answer != ${magic}, is ` + JSON.stringify(vars.answer);
   },
 
   () => {
@@ -163,12 +179,12 @@ test(
     result = nextline(`[hold, "bucket", the number] if [holds, "bucket", the number, yes].`);
     result = nextline(`[hold, "bucket", the number]?`);
     // console.info(result);
-    if (typeof result === "string") throw "Returned " + result + " instead of a scope";
+    if (typeof result === "string") throw "Returned " + result + " instead of some bindings";
     let vars = bindingsToObj(result);
     if (result.length > 1) throw "Too many vars: " + result.join(" ");
     if (result.length < 1) throw "Not enough vars: " + result.join(" ");
     if (!vars.number) throw "Var 'number' not found: " + result.join(" ");
-    if (isLiteral(vars.number) != magic) throw `number != ${magic}, is ` + isLiteral(vars.answer);
+    if (isLiteral(vars.number) != magic) throw `number != ${magic}, is ` + JSON.stringify(vars.answer);
   },
 
   // keep last for copy-pasting into testoutput.txt
